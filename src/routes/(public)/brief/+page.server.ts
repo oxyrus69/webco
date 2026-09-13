@@ -1,9 +1,23 @@
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db/client';
 import { briefSubmissions } from '$lib/server/db/schema';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import type { Actions } from './$types';
+import {
+	MB,
+	SLOT_BERKAS,
+	pesanTerlaluBesar,
+	pesanTipeSalah
+} from '$lib/brief/berkas';
+import { GalatBerkas, batasFormMB, blobSiap, hapusBerkas, maksBerkasMB, simpanBerkas } from '$lib/server/storage';
+import type { Actions, PageServerLoad } from './$types';
+
+// Klien perlu tahu apakah berkas diunggah langsung ke Blob dan seberapa besar
+// yang benar-benar bisa lewat di lingkungan ini (Vercel memutus body di 4,5MB).
+export const load: PageServerLoad = async () => ({
+	blobSiap: blobSiap(),
+	maksBerkasMB: maksBerkasMB(),
+	// Dipakai saat unggahan langsung gagal dan berkas terpaksa ikut formulir.
+	batasFormMB: batasFormMB()
+});
 
 const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 
@@ -28,27 +42,31 @@ function hex(fd: FormData, k: string): string | null {
 	return hexOk(v) ? v : null;
 }
 
-async function simpanFile(file: File, folder: string, prefix: string): Promise<string | null> {
-	if (!file || file.size === 0) return null;
-	const aman = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-60);
-	const nama = `${prefix}-${Date.now()}-${aman}`;
-	// Vercel filesystem hanya /tmp yang writable; gunakan fallback agar tidak melempar EROFS
-	// dan dossier tetap tersimpan walaupun berkas ikut terhapus antar request.
-	const roots = [join(process.cwd(), 'static', 'uploads', folder), join('/tmp', 'uploads', folder)];
-	for (const dir of roots) {
-		try {
-			await mkdir(dir, { recursive: true });
-			const buf = Buffer.from(await file.arrayBuffer());
-			await writeFile(join(dir, nama), buf);
-			// URL relatif tetap /uploads/... agar konsisten; di Vercel file hanya hidup di /tmp
-			return dir.startsWith('/tmp') ? null : `/uploads/${folder}/${nama}`;
-		} catch {
-			continue;
-		}
-	}
-	console.warn('[webco] simpanFile gagal di semua lokasi, lanjut tanpa berkas:', aman);
-	return null;
-}
+/**
+ * URL berkas yang sudah diunggah klien langsung ke Vercel Blob (hidden field `blob-<slot>`).
+ * Hanya host penyimpanan Blob sendiri yang diterima: field ini datang dari klien,
+ * jadi tanpa penjagaan ini siapa pun bisa menempelkan tautan luar lalu admin
+ * mengira itu berkas unggahan klien.
+ */
+const HOST_BLOB = /\.public\.blob\.vercel-storage\.com$/i;
+const urlBlob = (fd: FormData, slot: string) =>
+	fd
+		.getAll(`blob-${slot}`)
+		.map(String)
+		.filter((u) => {
+			try {
+				const x = new URL(u);
+				return x.protocol === 'https:' && HOST_BLOB.test(x.hostname);
+			} catch {
+				return false;
+			}
+		});
+
+const berkasMasuk = (fd: FormData, slot: string, banyak: boolean): File[] => {
+	if (banyak) return fd.getAll(slot).filter((f): f is File => f instanceof File && f.size > 0);
+	const satu = fd.get(slot);
+	return satu instanceof File && satu.size > 0 ? [satu] : [];
+};
 
 export const actions: Actions = {
 	kirim: async ({ request }) => {
@@ -71,47 +89,65 @@ export const actions: Actions = {
 		if (!d.warnaIdentitas?.trim()) galat.warnaIdentitas = 'Warna identitas wajib diisi.';
 		if (!d.gayaDesain?.trim()) galat.gayaDesain = 'Pilih gaya desain.';
 
-		const batas = (f: File | null, maxMB: number, nama: string) => {
-			if (f && f.size > maxMB * 1024 * 1024)
-				galat[nama] = `Ukuran melebihi ${maxMB}MB. Kecilkan lalu unggah ulang.`;
-		};
-		const logo = fd.get('logoFile') as File | null;
-		const katalog = fd.get('katalogFile') as File | null;
-		const porto = fd.get('portofolioFile') as File | null;
-		const legal = fd.get('legalitasFile') as File | null;
-		batas(logo, 5, 'logoFile');
-		batas(katalog, 10, 'katalogFile');
-		batas(porto, 10, 'portofolioFile');
-		batas(legal, 10, 'legalitasFile');
-		for (const f of fd.getAll('logoKlienFiles')) batas(f as File, 5, 'logoKlienFiles');
-		for (const f of fd.getAll('fotoTimFiles')) batas(f as File, 5, 'fotoTimFiles');
+		// Batas ukuran & tipe dijaga di sini juga (bukan hanya di browser).
+		const batasLingkungan = maksBerkasMB();
+		for (const slot of SLOT_BERKAS) {
+			const maks = Math.min(slot.maksMB, batasLingkungan);
+			for (const f of berkasMasuk(fd, slot.nama, !!slot.banyak)) {
+				if (f.size > maks * MB) galat[slot.nama] = pesanTerlaluBesar(slot, f.size, maks);
+				else if (f.type && !slot.tipe.includes(f.type)) galat[slot.nama] = pesanTipeSalah(slot);
+			}
+		}
 
 		if (Object.keys(galat).length) return fail(400, { galat, nilai: d });
 
 		const noTiket = ticket();
-		// Pisahkan tahap simpan berkas (best-effort) dari insert DB agar kegagalan FS
-		// tidak menyamar jadi "Database tidak dapat dihubungi".
-		let logoUrl: string | null = null;
-		let katalogUrl: string | null = null;
-		let portoUrl: string | null = null;
-		let legalUrl: string | null = null;
-		const logoKlienUrls: string[] = [];
-		const fotoTimUrls: string[] = [];
-		try {
-			logoUrl = logo && logo.size ? await simpanFile(logo, noTiket, 'logo') : null;
-			katalogUrl = katalog && katalog.size ? await simpanFile(katalog, noTiket, 'katalog') : null;
-			portoUrl = porto && porto.size ? await simpanFile(porto, noTiket, 'portofolio') : null;
-			legalUrl = legal && legal.size ? await simpanFile(legal, noTiket, 'legalitas') : null;
-			for (const f of fd.getAll('logoKlienFiles')) {
-				const ff = f as File;
-				if (ff.size) { const u = await simpanFile(ff, noTiket, 'klien'); if (u) logoKlienUrls.push(u); }
+		// Berkas yang sudah diunggah langsung ke Blob dikirim sebagai URL; sisanya
+		// (pengirim tanpa JS, atau Blob belum dikonfigurasi) disimpan sekarang.
+		let logoUrl: string | null = urlBlob(fd, 'logoFile')[0] ?? null;
+		let katalogUrl: string | null = urlBlob(fd, 'katalogFile')[0] ?? null;
+		let portoUrl: string | null = urlBlob(fd, 'portofolioFile')[0] ?? null;
+		let legalUrl: string | null = urlBlob(fd, 'legalitasFile')[0] ?? null;
+		const logoKlienUrls: string[] = urlBlob(fd, 'logoKlienFiles');
+		const fotoTimUrls: string[] = urlBlob(fd, 'fotoTimFiles');
+
+		const simpan = async (slot: string): Promise<string | null> => {
+			const [file] = berkasMasuk(fd, slot, false);
+			if (!file) return null;
+			try {
+				return await simpanBerkas(file, noTiket, slot);
+			} catch (e) {
+				console.warn('[webco] simpanBerkas gagal:', slot, e);
+				galat[slot] =
+					e instanceof GalatBerkas
+						? e.message
+						: 'Berkas gagal disimpan. Coba kirim ulang atau kecilkan berkasnya.';
+				return null;
 			}
-			for (const f of fd.getAll('fotoTimFiles')) {
-				const ff = f as File;
-				if (ff.size) { const u = await simpanFile(ff, noTiket, 'tim'); if (u) fotoTimUrls.push(u); }
+		};
+		if (!logoUrl) logoUrl = await simpan('logoFile');
+		if (!katalogUrl) katalogUrl = await simpan('katalogFile');
+		if (!portoUrl) portoUrl = await simpan('portofolioFile');
+		if (!legalUrl) legalUrl = await simpan('legalitasFile');
+		for (const f of berkasMasuk(fd, 'logoKlienFiles', true)) {
+			try {
+				logoKlienUrls.push(await simpanBerkas(f, noTiket, 'logoKlienFiles'));
+			} catch {
+				galat.logoKlienFiles = 'Sebagian logo klien gagal disimpan. Kirim ulang berkasnya.';
 			}
-		} catch (e) {
-			console.warn('[webco] simpanFile gagal, lanjut tanpa berkas:', e);
+		}
+		for (const f of berkasMasuk(fd, 'fotoTimFiles', true)) {
+			try {
+				fotoTimUrls.push(await simpanBerkas(f, noTiket, 'fotoTimFiles'));
+			} catch {
+				galat.fotoTimFiles = 'Sebagian foto tim gagal disimpan. Kirim ulang berkasnya.';
+			}
+		}
+
+		// Berkas sudah terlanjur masuk tetapi dossier batal dibuat: bersihkan lagi.
+		if (Object.keys(galat).length) {
+			await hapusBerkas(noTiket, [logoUrl, katalogUrl, portoUrl, legalUrl, ...logoKlienUrls, ...fotoTimUrls]);
+			return fail(400, { galat, nilai: d });
 		}
 
 		try {

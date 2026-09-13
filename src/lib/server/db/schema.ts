@@ -1,4 +1,11 @@
-import { pgTable, uuid, text, integer, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, jsonb, customType } from 'drizzle-orm/pg-core';
+
+// bytea mentah untuk berkas unggahan; drizzle belum punya tipe bawaannya.
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+	dataType() {
+		return 'bytea';
+	}
+});
 
 export const briefSubmissions = pgTable('brief_submissions', {
 	id: uuid('id').defaultRandom().primaryKey(),
@@ -66,5 +73,18 @@ export const briefSubmissions = pgTable('brief_submissions', {
 	catatan: text('catatan')
 });
 
+// Berkas unggahan disimpan di Neon saat Vercel Blob belum dikonfigurasi, supaya
+// berkas tetap sampai ke admin di lingkungan mana pun.
+export const briefFiles = pgTable('brief_files', {
+	id: uuid('id').defaultRandom().primaryKey(),
+	ticket: text('ticket').notNull(),
+	nama: text('nama').notNull(),
+	tipe: text('tipe'),
+	ukuran: integer('ukuran').notNull(),
+	isi: bytea('isi').notNull(),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+});
+
 export type BriefSubmission = typeof briefSubmissions.$inferSelect;
 export type NewBriefSubmission = typeof briefSubmissions.$inferInsert;
+export type BriefFile = typeof briefFiles.$inferSelect;

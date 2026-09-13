@@ -2,8 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db/client';
 import { briefSubmissions } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { hapusBerkas } from '$lib/server/storage';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -29,9 +28,16 @@ export const actions: Actions = {
 	hapus: async ({ params }) => {
 		const rows = await db.select().from(briefSubmissions).where(eq(briefSubmissions.id, params.id)).limit(1);
 		if (!rows.length) throw error(404, 'Dossier tidak ditemukan.');
-		try {
-			await rm(join(process.cwd(), 'static', 'uploads', rows[0].ticket), { recursive: true, force: true });
-		} catch {}
+		const r = rows[0];
+		// Bersihkan berkasnya di semua lapis penyimpanan (Blob, Neon, folder lokal).
+		await hapusBerkas(r.ticket, [
+			r.logoUrl,
+			r.katalogUrl,
+			r.portofolioFileUrl,
+			r.legalitasFileUrl,
+			...(r.logoKlienUrls ?? []),
+			...(r.fotoTimUrls ?? [])
+		]);
 		await db.delete(briefSubmissions).where(eq(briefSubmissions.id, params.id));
 		throw redirect(303, '/admin');
 	}

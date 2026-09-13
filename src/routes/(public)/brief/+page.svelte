@@ -4,8 +4,16 @@
 	import { browser } from '$app/environment';
 	import { STEPS, GAYA_DESAIN, FITUR_LIST, CONTOH } from '$lib/brief/steps';
 	import { validateStep } from '$lib/brief/validation';
+	import {
+		MB,
+		SLOT_BERKAS,
+		namaAman,
+		pesanTerlaluBesar,
+		pesanTipeSalah,
+		slotBerkas
+	} from '$lib/brief/berkas';
 
-	let { form } = $props();
+	let { data, form } = $props();
 
 	type Draft = Record<string, string>;
 	const KUNCI = 'webco-draf-v1';
@@ -29,6 +37,136 @@
 	let selesai = $state<boolean[]>(Array(8).fill(false));
 	let terkirim = $state(false);
 	let galatUmum = $state('');
+
+	/* ---------- Berkas unggahan ----------
+	   Bila Vercel Blob aktif, berkas dikirim langsung dari browser ke Blob sehingga
+	   ukurannya tidak dibatasi body request fungsi server (4,5MB di Vercel). Kalau
+	   Blob belum ada atau unggahan langsung gagal, berkas ikut dikirim bersama
+	   formulir dan disimpan di sisi server (folder lokal saat dev, Neon saat produksi). */
+	type StatusBerkas = 'kosong' | 'mengunggah' | 'siap' | 'lewat-form' | 'gagal';
+	type HasilBerkas = { status: StatusBerkas; urls: string[]; pesan: string; persen: number };
+	const KOSONG: HasilBerkas = { status: 'kosong', urls: [], pesan: '', persen: 0 };
+
+	let berkas = $state<Record<string, HasilBerkas>>({});
+	// Versi naik setiap kali pengirim menekan "Ganti berkas" → input dibuat ulang kosong.
+	let versiBerkas = $state<Record<string, number>>({});
+
+	const infoBerkas = (slot: string): HasilBerkas => berkas[slot] ?? KOSONG;
+	const sudahUnggah = (slot: string) => infoBerkas(slot).urls.length > 0;
+	const mengunggah = $derived(SLOT_BERKAS.some((s) => infoBerkas(s.nama).status === 'mengunggah'));
+	// Selama ada berkas yang ditolak, dossier tidak boleh dikirim supaya pengirim
+	// tidak mengirim dossier tanpa lampiran yang ia kira sudah masuk.
+	const berkasGagal = $derived(SLOT_BERKAS.some((s) => infoBerkas(s.nama).status === 'gagal'));
+	// Batas efektif di lingkungan ini: jangan menjanjikan 10MB bila server hanya
+	// sanggup menerima 4MB (mis. Vercel tanpa Blob).
+	const maksSlot = (nama: string) => {
+		const s = slotBerkas(nama);
+		if (!s) return 0;
+		return Math.min(s.maksMB, data?.maksBerkasMB ?? s.maksMB);
+	};
+
+	const acak = () =>
+		typeof crypto !== 'undefined' && 'randomUUID' in crypto
+			? crypto.randomUUID()
+			: Math.random().toString(36).slice(2, 12);
+
+	async function pilihBerkas(e: Event, slotNama: string) {
+		const input = e.currentTarget as HTMLInputElement;
+		const slot = slotBerkas(slotNama);
+		if (!slot) return;
+		const daftar = [...(input.files ?? [])];
+		if (!daftar.length) {
+			berkas[slotNama] = { ...KOSONG };
+			return;
+		}
+
+		// Ukuran & tipe diperiksa lebih dulu supaya pesannya muncul sebelum apa pun dikirim.
+		const batas = Math.min(slot.maksMB, data?.maksBerkasMB ?? slot.maksMB);
+		for (const f of daftar) {
+			if (f.size > batas * MB) {
+				berkas[slotNama] = { status: 'gagal', urls: [], pesan: pesanTerlaluBesar(slot, f.size, batas), persen: 0 };
+				input.value = '';
+				return;
+			}
+			if (f.type && !slot.tipe.includes(f.type)) {
+				berkas[slotNama] = { status: 'gagal', urls: [], pesan: pesanTipeSalah(slot), persen: 0 };
+				input.value = '';
+				return;
+			}
+		}
+
+		if (!data?.blobSiap) {
+			berkas[slotNama] = {
+				status: 'lewat-form',
+				urls: [],
+				pesan: 'Berkas ini ikut terkirim bersama formulir.',
+				persen: 100
+			};
+			return;
+		}
+
+		berkas[slotNama] = {
+			status: 'mengunggah',
+			urls: [],
+			pesan: daftar.length > 1 ? `Mengunggah ${daftar.length} berkas…` : 'Mengunggah berkas…',
+			persen: 0
+		};
+		try {
+			const { upload } = await import('@vercel/blob/client');
+			const urls: string[] = [];
+			for (const f of daftar) {
+				const hasil = await upload(`uploads/${acak()}/${namaAman(f.name)}`, f, {
+					access: 'public',
+					handleUploadUrl: '/api/berkas',
+					multipart: true,
+					onUploadProgress: ({ percentage }) => {
+						berkas[slotNama] = { ...infoBerkas(slotNama), persen: Math.round(percentage) };
+					}
+				});
+				urls.push(hasil.url);
+			}
+			berkas[slotNama] = {
+				status: 'siap',
+				urls,
+				pesan: urls.length > 1 ? `${urls.length} berkas siap ikut terkirim.` : 'Berkas siap ikut terkirim.',
+				persen: 100
+			};
+		} catch (err) {
+			console.warn('[webco] unggah langsung gagal, berkas dikirim lewat formulir:', err);
+			// Berkas yang ikut formulir harus muat di body request server; kalau tidak,
+			// tolak sekarang dengan pesan yang jelas — jangan biarkan server memutusnya
+			// diam-diam saat pengiriman.
+			const batasForm = data?.batasFormMB ?? 10;
+			const kebesaran = daftar.find((f) => f.size > batasForm * MB);
+			if (kebesaran) {
+				berkas[slotNama] = {
+					status: 'gagal',
+					urls: [],
+					pesan: pesanTerlaluBesar(slot, kebesaran.size, batasForm),
+					persen: 0
+				};
+				return;
+			}
+			berkas[slotNama] = {
+				status: 'lewat-form',
+				urls: [],
+				pesan:
+					'Unggahan langsung tidak tersedia — berkas akan dikirim bersama formulir. Bila pengiriman ditolak, kecilkan berkasnya lalu coba lagi.',
+				persen: 0
+			};
+		}
+	}
+
+	function gantiBerkas(slotNama: string) {
+		berkas[slotNama] = { ...KOSONG };
+		versiBerkas[slotNama] = (versiBerkas[slotNama] ?? 0) + 1;
+	}
+
+	const berkasTerlampir = $derived(
+		SLOT_BERKAS.map((s) => ({ slot: s, info: infoBerkas(s.nama) })).filter(
+			({ info }) => info.status !== 'kosong'
+		)
+	);
 
 	if (browser) {
 		try {
@@ -88,6 +226,25 @@
 
 <svelte:head><title>Isi Briefing — WebCo.</title></svelte:head>
 
+{#snippet catatanBerkas(slot: string)}
+	{#if infoBerkas(slot).status === 'mengunggah'}
+		<div class="berkas-maju" aria-hidden="true"><i style="width: {infoBerkas(slot).persen}%"></i></div>
+	{/if}
+	{#if infoBerkas(slot).pesan}
+		<p
+			class="berkas-pesan"
+			class:siap={infoBerkas(slot).status === 'siap' || infoBerkas(slot).status === 'lewat-form'}
+			class:galat={infoBerkas(slot).status === 'gagal'}
+			aria-live="polite"
+		>{infoBerkas(slot).pesan}</p>
+	{/if}
+	{#if sudahUnggah(slot)}
+		<button type="button" class="btn btn-kedua btn-kecil" onclick={() => gantiBerkas(slot)}>Ganti berkas</button>
+	{:else if infoBerkas(slot).status === 'gagal'}
+		<button type="button" class="btn btn-kedua btn-kecil" onclick={() => gantiBerkas(slot)}>Kosongkan berkas</button>
+	{/if}
+{/snippet}
+
 <div class="workspace">
 	<div class="wrap">
 		<h1 class="sr-only">Isi dossier briefing WebCo.</h1>
@@ -138,6 +295,13 @@
 						await update();
 					};
 				}}>
+					<!-- URL berkas yang sudah diunggah langsung ke Vercel Blob dari browser -->
+					{#each SLOT_BERKAS as sb}
+						{#each infoBerkas(sb.nama).urls as u}
+							<input type="hidden" name={`blob-${sb.nama}`} value={u} />
+						{/each}
+					{/each}
+
 					<!-- hidden fitur checkboxes are real inputs below; keep ticket-agnostic -->
 					{#if langkah < 8}
 						{@const s = STEPS[langkah]}
@@ -249,10 +413,20 @@
 							</div>
 						</div>
 						<div class="medan" class:invalid={galat.logoFile || serverGalat.logoFile}>
-							<label for="logoFile">Logo perusahaan <span class="ops">PNG / SVG / WebP, maks 5MB</span></label>
+							<label for="logoFile">Logo perusahaan <span class="ops">PNG / SVG / WebP, maks {maksSlot('logoFile')}MB</span></label>
 							<div class="unggah">
-								<input id="logoFile" name="logoFile" type="file" accept=".png,.svg,.webp,.jpg,.jpeg" />
+								{#key versiBerkas.logoFile ?? 0}
+									<input
+										id="logoFile"
+										name="logoFile"
+										type="file"
+										accept=".png,.svg,.webp,.jpg,.jpeg"
+										onchange={(e) => pilihBerkas(e, 'logoFile')}
+										disabled={sudahUnggah('logoFile')}
+									/>
+								{/key}
 								<div class="meta">Gunakan resolusi tertinggi yang Anda punya. Bila belum ada logo, kosongkan.</div>
+								{@render catatanBerkas('logoFile')}
 							</div>
 							{#if serverGalat.logoFile}<span class="galat">{serverGalat.logoFile}</span>{/if}
 						</div>
@@ -301,8 +475,14 @@
 							<textarea id="usp" name="usp" bind:value={d.usp}></textarea>
 						</div>
 						<div class="medan">
-							<label for="katalogFile">Katalog / brosur <span class="ops">PDF, maks 10MB</span></label>
-							<div class="unggah"><input id="katalogFile" name="katalogFile" type="file" accept=".pdf" /><div class="meta">Bila tidak ada, kosongkan.</div></div>
+							<label for="katalogFile">Katalog / brosur <span class="ops">PDF, maks {maksSlot('katalogFile')}MB</span></label>
+							<div class="unggah">
+								{#key versiBerkas.katalogFile ?? 0}
+									<input id="katalogFile" name="katalogFile" type="file" accept=".pdf" onchange={(e) => pilihBerkas(e, 'katalogFile')} disabled={sudahUnggah('katalogFile')} />
+								{/key}
+								<div class="meta">Bila tidak ada, kosongkan.</div>
+								{@render catatanBerkas('katalogFile')}
+							</div>
 						</div>
 					</div>
 
@@ -313,16 +493,26 @@
 							<textarea id="klienDaftar" name="klienDaftar" placeholder="cth: PT Waskita Beton, Dinas PU Kota Bandung, Hotel Amaris." bind:value={d.klienDaftar}></textarea>
 						</div>
 						<div class="medan">
-							<label for="logoKlienFiles">Logo klien / mitra <span class="ops">boleh lebih dari satu, maks 5MB per file</span></label>
-							<div class="unggah"><input id="logoKlienFiles" name="logoKlienFiles" type="file" multiple accept=".png,.svg,.webp,.jpg,.jpeg" /></div>
+							<label for="logoKlienFiles">Logo klien / mitra <span class="ops">boleh lebih dari satu, maks {maksSlot('logoKlienFiles')}MB per file</span></label>
+							<div class="unggah">
+								{#key versiBerkas.logoKlienFiles ?? 0}
+									<input id="logoKlienFiles" name="logoKlienFiles" type="file" multiple accept=".png,.svg,.webp,.jpg,.jpeg" onchange={(e) => pilihBerkas(e, 'logoKlienFiles')} disabled={sudahUnggah('logoKlienFiles')} />
+								{/key}
+								{@render catatanBerkas('logoKlienFiles')}
+							</div>
 						</div>
 						<div class="medan">
 							<label for="portofolioDesc">Proyek unggulan <span class="ops">opsional</span></label>
 							<textarea id="portofolioDesc" name="portofolioDesc" placeholder="cth: 2023 — Atap GOR Soreang 4.200 m², selesai 45 hari." bind:value={d.portofolioDesc}></textarea>
 						</div>
 						<div class="medan">
-							<label for="portofolioFile">Berkas portofolio <span class="ops">PDF/gambar, maks 10MB</span></label>
-							<div class="unggah"><input id="portofolioFile" name="portofolioFile" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" /></div>
+							<label for="portofolioFile">Berkas portofolio <span class="ops">PDF/gambar, maks {maksSlot('portofolioFile')}MB</span></label>
+							<div class="unggah">
+								{#key versiBerkas.portofolioFile ?? 0}
+									<input id="portofolioFile" name="portofolioFile" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onchange={(e) => pilihBerkas(e, 'portofolioFile')} disabled={sudahUnggah('portofolioFile')} />
+								{/key}
+								{@render catatanBerkas('portofolioFile')}
+							</div>
 						</div>
 						<div class="medan">
 							<label for="testimoni">Testimoni pelanggan <span class="ops">sertakan nama dan jabatan</span></label>
@@ -337,16 +527,26 @@
 							<textarea id="anggotaTim" name="anggotaTim" placeholder="cth: Ir. Dedi Kurnia — Direktur Utama. Sari Lestari — Kepala Operasional." bind:value={d.anggotaTim}></textarea>
 						</div>
 						<div class="medan">
-							<label for="fotoTimFiles">Foto anggota tim <span class="ops">boleh lebih dari satu</span></label>
-							<div class="unggah"><input id="fotoTimFiles" name="fotoTimFiles" type="file" multiple accept=".jpg,.jpeg,.png,.webp" /></div>
+							<label for="fotoTimFiles">Foto anggota tim <span class="ops">boleh lebih dari satu, maks {maksSlot('fotoTimFiles')}MB per file</span></label>
+							<div class="unggah">
+								{#key versiBerkas.fotoTimFiles ?? 0}
+									<input id="fotoTimFiles" name="fotoTimFiles" type="file" multiple accept=".jpg,.jpeg,.png,.webp" onchange={(e) => pilihBerkas(e, 'fotoTimFiles')} disabled={sudahUnggah('fotoTimFiles')} />
+								{/key}
+								{@render catatanBerkas('fotoTimFiles')}
+							</div>
 						</div>
 						<div class="medan">
 							<label for="legalitasDesc">Sertifikasi / penghargaan / legalitas <span class="ops">cth: ISO 9001, Halal MUI</span></label>
 							<textarea id="legalitasDesc" name="legalitasDesc" style="min-height:80px" bind:value={d.legalitasDesc}></textarea>
 						</div>
 						<div class="medan">
-							<label for="legalitasFile">Berkas sertifikasi <span class="ops">PDF/gambar, maks 10MB</span></label>
-							<div class="unggah"><input id="legalitasFile" name="legalitasFile" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" /></div>
+							<label for="legalitasFile">Berkas sertifikasi <span class="ops">PDF/gambar, maks {maksSlot('legalitasFile')}MB</span></label>
+							<div class="unggah">
+								{#key versiBerkas.legalitasFile ?? 0}
+									<input id="legalitasFile" name="legalitasFile" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onchange={(e) => pilihBerkas(e, 'legalitasFile')} disabled={sudahUnggah('legalitasFile')} />
+								{/key}
+								{@render catatanBerkas('legalitasFile')}
+							</div>
 						</div>
 					</div>
 
@@ -453,6 +653,24 @@
 								<button type="button" class="btn btn-kedua btn-kecil" style="margin-top:10px" onclick={() => ke(i)}>Betulkan bab {s.no}</button>
 							</div>
 						{/each}
+						{#if berkasTerlampir.length}
+							<div class="ringkasan-bab">
+								<h3>Berkas yang ikut terkirim</h3>
+								<ul class="daftar-berkas">
+									{#each berkasTerlampir as b}
+										<li>
+											<b>{b.slot.label}</b> — {b.info.status === 'siap'
+												? 'sudah diunggah'
+												: b.info.status === 'mengunggah'
+													? 'sedang diunggah…'
+													: b.info.status === 'gagal'
+														? 'gagal — periksa pesan di bab terkait'
+														: 'dikirim bersama formulir'}
+										</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
 						<p class="persetujuan">Dengan menekan Kirim dossier, Anda setuju dihubungi WebCo. melalui kontak di Bab 01.</p>
 					</div>
 
@@ -463,9 +681,18 @@
 						</div>
 						<div>
 							{#if langkah < 8}<button type="button" class="btn btn-primer" onclick={lanjut}>{langkah === 7 ? 'Periksa ringkasan' : 'Lanjut'}</button>{/if}
-							{#if langkah === 8}<button type="submit" class="btn btn-primer">Kirim dossier</button>{/if}
+							{#if langkah === 8}<button type="submit" class="btn btn-primer" disabled={mengunggah || berkasGagal}>Kirim dossier</button>{/if}
 						</div>
 					</div>
+					{#if mengunggah}
+						<p class="draf-info" aria-live="polite">Menunggu berkas selesai diunggah sebelum mengirim…</p>
+					{/if}
+					{#if berkasGagal}
+						<p class="draf-info galat" aria-live="polite">
+							Ada berkas yang ditolak. Perbaiki atau kosongkan berkas itu di bab terkait sebelum
+							mengirim dossier.
+						</p>
+					{/if}
 					<p class="draf-info">Draf tersimpan otomatis di perangkat ini · <b>{persen}% tuntas</b></p>
 				</form>
 			</div>

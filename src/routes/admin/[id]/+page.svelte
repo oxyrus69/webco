@@ -4,6 +4,17 @@
 	const r = $derived(data.row as any);
 	const berkas = (u?: string | null) => !!u;
 
+	// Tautan berkas ditampilkan dengan nama berkasnya, bukan URL panjang.
+	const namaDariUrl = (u: string) => {
+		try {
+			const segmen = new URL(u, 'https://lokal').pathname.split('/').filter(Boolean);
+			const nama = decodeURIComponent(segmen[segmen.length - 1] ?? u);
+			return nama.length > 48 ? nama.slice(-48) : nama;
+		} catch {
+			return u;
+		}
+	};
+
 	const daftar = [
 		{ no: '01', judul: 'Informasi Kontak Klien', pendek: 'Kontak' },
 		{ no: '02', judul: 'Identitas Dasar Perusahaan', pendek: 'Identitas' },
@@ -79,9 +90,9 @@
 			{:else if bab === 3}
 				<section class="detail-bab"><span class="no-bab">BAB 04 · {daftar[3].judul}</span><h3>Produk / layanan</h3><p style="white-space:pre-wrap">{r.daftarProduk ?? '—'}</p><h3>Keunggulan</h3><p style="white-space:pre-wrap">{r.usp ?? '—'}</p>{#if berkas(r.katalogUrl)}<p class="berkas">Katalog: <a href={r.katalogUrl} target="_blank" rel="noreferrer">unduh PDF</a></p>{/if}</section>
 			{:else if bab === 4}
-				<section class="detail-bab"><span class="no-bab">BAB 05 · {daftar[4].judul}</span><p><b>Klien:</b> {r.klienDaftar ?? '—'}</p>{#if r.logoKlienUrls?.length}<p>Berkas logo klien:</p>{#each r.logoKlienUrls as u}<p class="berkas"><a href={u} target="_blank" rel="noreferrer">{u}</a></p>{/each}{/if}<p><b>Portofolio:</b> {r.portofolioDesc ?? '—'}</p>{#if berkas(r.portofolioFileUrl)}<p class="berkas">Berkas: <a href={r.portofolioFileUrl} target="_blank" rel="noreferrer">unduh</a></p>{/if}<p><b>Testimoni:</b> {r.testimoni ?? '—'}</p></section>
+				<section class="detail-bab"><span class="no-bab">BAB 05 · {daftar[4].judul}</span><p><b>Klien:</b> {r.klienDaftar ?? '—'}</p>{#if r.logoKlienUrls?.length}<p>Berkas logo klien:</p>{#each r.logoKlienUrls as u}<p class="berkas"><a href={u} target="_blank" rel="noreferrer">{namaDariUrl(u)}</a></p>{/each}{/if}<p><b>Portofolio:</b> {r.portofolioDesc ?? '—'}</p>{#if berkas(r.portofolioFileUrl)}<p class="berkas">Berkas: <a href={r.portofolioFileUrl} target="_blank" rel="noreferrer">unduh</a></p>{/if}<p><b>Testimoni:</b> {r.testimoni ?? '—'}</p></section>
 			{:else if bab === 5}
-				<section class="detail-bab"><span class="no-bab">BAB 06 · {daftar[5].judul}</span><p style="white-space:pre-wrap">{r.anggotaTim ?? '—'}</p>{#if r.fotoTimUrls?.length}{#each r.fotoTimUrls as u}<p class="berkas"><a href={u} target="_blank" rel="noreferrer">{u}</a></p>{/each}{/if}<p><b>Legalitas:</b> {r.legalitasDesc ?? '—'}</p>{#if berkas(r.legalitasFileUrl)}<p class="berkas">Berkas: <a href={r.legalitasFileUrl} target="_blank" rel="noreferrer">unduh</a></p>{/if}</section>
+				<section class="detail-bab"><span class="no-bab">BAB 06 · {daftar[5].judul}</span><p style="white-space:pre-wrap">{r.anggotaTim ?? '—'}</p>{#if r.fotoTimUrls?.length}{#each r.fotoTimUrls as u}<p class="berkas"><a href={u} target="_blank" rel="noreferrer">{namaDariUrl(u)}</a></p>{/each}{/if}<p><b>Legalitas:</b> {r.legalitasDesc ?? '—'}</p>{#if berkas(r.legalitasFileUrl)}<p class="berkas">Berkas: <a href={r.legalitasFileUrl} target="_blank" rel="noreferrer">unduh</a></p>{/if}</section>
 			{:else if bab === 6}
 				<section class="detail-bab"><span class="no-bab">BAB 07 · {daftar[6].judul}</span><p>IG: {r.instagram ?? '—'}<br />LinkedIn: {r.linkedin ?? '—'}<br />FB/X: {r.facebookX ?? '—'}<br />YT/TikTok: {r.youtubeTiktok ?? '—'}</p></section>
 			{:else}

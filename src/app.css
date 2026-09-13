@@ -40,7 +40,7 @@ a { color: var(--tinta); text-underline-offset: 3px; }
 
 /* Kepala */
 .kepala { border-bottom: 1px solid var(--garis); background: var(--kertas); position: sticky; top: 0; z-index: 20; }
-.kepala-dalam { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; }
+.kepala-dalam { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; }
 .merek { display: flex; align-items: baseline; gap: 10px; text-decoration: none; }
 .merek-nama { font-weight: 800; font-size: 22px; letter-spacing: -0.02em; }
 .merek-titik { color: var(--kuningan); font-weight: 800; font-size: 22px; }
@@ -66,7 +66,7 @@ a { color: var(--tinta); text-underline-offset: 3px; }
 .btn[disabled] { opacity: 0.55; cursor: not-allowed; }
 
 /* Landing */
-.pembuka { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 40px; padding: 56px 0 48px; align-items: start; }
+.pembuka { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 40px; padding-block: 56px 48px; align-items: start; }
 .pembuka h1 { font-size: clamp(30px, 4vw, 42px); line-height: 1.12; letter-spacing: -0.02em; font-weight: 800; margin: 0 0 14px; max-width: 22ch; text-wrap: balance; }
 .pembuka .lead { font-size: 17px; color: var(--tinta-redup); max-width: 60ch; margin: 0 0 22px; text-wrap: pretty; }
 .aksi { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }
@@ -144,8 +144,19 @@ a { color: var(--tinta); text-underline-offset: 3px; }
 .fitur-grid label.terpilih { border-color: var(--tinta); background: #f8f6ef; }
 .unggah { border: 1px dashed #b9b09a; border-radius: var(--radius-kartu); padding: 14px; background: #fbfaf6; }
 .unggah input { font-size: 14px; }
+.unggah input[type='file']:disabled { opacity: 0.6; }
 .unggah .meta { font-size: 13px; color: var(--tinta-redup); margin-top: 6px; }
 .unggah .meta code { font-family: var(--mono); font-size: 12px; }
+.unggah .btn { margin-top: 10px; }
+.berkas-pesan { font-size: 13px; color: var(--tinta-redup); margin: 6px 0 0; text-wrap: pretty; }
+.berkas-pesan.siap { color: var(--lumut); }
+.berkas-pesan.galat { font-size: 14px; color: var(--bata); font-weight: 700; }
+.berkas-pesan.galat::before { content: '! '; font-weight: 800; }
+.berkas-maju { height: 6px; background: #e7e1d1; border-radius: 99px; overflow: hidden; margin: 8px 0 0; }
+.berkas-maju i { display: block; height: 100%; background: var(--kuningan); border-radius: 99px; }
+.daftar-berkas { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 2px; font-size: 14px; }
+.draf-info.galat { color: var(--bata); font-weight: 700; }
+.draf-info.galat::before { content: '! '; font-weight: 800; }
 .navigasi-bab { display: flex; justify-content: space-between; gap: 12px; margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--garis); }
 .draf-info { font-size: 13px; color: var(--tinta-redup); margin-top: 12px; }
 .draf-info b { color: var(--tinta); }
@@ -207,7 +218,7 @@ a { color: var(--tinta); text-underline-offset: 3px; }
 .admin-utama { min-width: 0; display: flex; flex-direction: column; min-height: 100vh; }
 .admin-utama main { flex: 1; }
 .admin-bar { background: var(--kertas); border-bottom: 1px solid var(--garis); position: sticky; top: 0; z-index: 20; }
-.admin-bar-dalam { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+.admin-bar-dalam { display: flex; align-items: center; gap: 12px; padding-block: 12px; }
 .admin-judul-halaman { font-size: 14px; font-weight: 700; }
 .admin-nav { display: flex; gap: 8px; align-items: center; margin-left: auto; }
 .admin-nav a { color: var(--tinta-redup); text-decoration: none; font-size: 14px; padding: 8px 12px; border-radius: var(--radius-tombol); }
@@ -281,12 +292,16 @@ code { font-family: var(--mono); font-size: 0.85em; }
 @media (max-width: 600px) { .pemilih-warna { grid-template-columns: 1fr; } }
 
 @media (max-width: 900px) {
-	.pembuka { grid-template-columns: 1fr; padding: 36px 0; }
+	.pembuka { grid-template-columns: 1fr; padding-block: 36px; }
 	.dossier-grid { grid-template-columns: 1fr; }
 	.dossier-grid > * { min-width: 0; }
 	/* Navigator vertikal → stepper chips horizontal yang sticky tepat di bawah kepala */
 	.kepala { position: static; }
 	.navigator { position: sticky; top: 8px; z-index: 15; padding: 10px; }
+	/* Fokus keyboard, pindah bab, dan scrollIntoView harus berhenti di bawah navigator
+	   sticky, bukan di tepi atas layar — 138px = 8px top + 122px tinggi navigator + 8px napas.
+	   Dipasang di :root (bukan scroll-margin per elemen) agar satu mekanisme saja. */
+	html { scroll-padding-top: 138px; }
 	.navigator h2 { display: none; }
 	.nav-bab { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
 	.nav-bab li { flex: 0 0 auto; scroll-snap-align: start; }
@@ -308,15 +323,15 @@ code { font-family: var(--mono); font-size: 0.85em; }
 .berkas a, .ringkasan-bab dd, .detail-bab p { overflow-wrap: anywhere; }
 .baris-hex { flex-wrap: wrap; }
 
-/* Zona jempol: tombol primer penuh di atas, sekunder di bawahnya */
+/* Zona jempol: aksi utama penuh selebar lembar, tombol sekunder ringkas di atasnya */
 @media (max-width: 600px) {
 	.wrap { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
 	.workspace { padding: 16px 0 48px; }
-	.pembuka { padding: 28px 0 32px; }
-	.kepala-dalam { padding: 10px 0; gap: 8px; }
+	.pembuka { padding-block: 28px 32px; }
+	.kepala-dalam { padding-block: 10px; gap: 8px; }
 	.merek-nama, .merek-titik { font-size: 19px; }
 	.merek-tag { display: none; }
-	.btn-kecil { padding: 8px 12px; font-size: 13px; }
+	.btn-kecil { padding: 8px 12px; font-size: 13px; min-height: 44px; }
 	.lembar { padding: 16px; }
 	.lembar-kepala h2 { font-size: 20px; }
 	.judul-halaman { font-size: 26px; }
@@ -324,9 +339,15 @@ code { font-family: var(--mono); font-size: 0.85em; }
 	.langkah li { grid-template-columns: 1fr; gap: 2px; }
 	.meta-cetak div { grid-template-columns: 110px 1fr; }
 	.admin-judul-halaman { display: none; }
-	/* Tombol aksi landing: selebar teks, rata kiri — tidak full-bleed */
+	/* Tombol aksi: selebar teks tetapi seragam, rata kiri — tidak full-bleed */
 	.aksi { flex-direction: column; align-items: flex-start; }
-	.aksi .btn { width: auto; min-height: 48px; }
+	.aksi .btn { width: auto; min-width: min(240px, 100%); min-height: 48px; }
+	/* Navigasi bab: lanjut/turun satu baris penuh agar mudah dijangkau jempol */
+	.navigasi-bab { flex-direction: column; gap: 12px; }
+	.navigasi-bab > div:last-child .btn { width: 100%; }
+	/* Daftar isi contoh: dua kolom agar tidak mendorong isi ke bawah */
+	.contoh-daftar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0 20px; }
+	.contoh-daftar a { width: 100%; font-size: 13px; padding: 9px 12px; min-height: 44px; justify-content: flex-start; text-align: start; }
 	.sukses { margin: 24px auto; padding: 24px 20px; }
 }
 
@@ -341,16 +362,20 @@ code { font-family: var(--mono); font-size: 0.85em; }
 @media (pointer: coarse) {
 	.nav-bab button { min-height: 44px; }
 	.nav a { padding: 10px 12px; }
+	.admin-nav a, .saklar-sidebar { min-height: 44px; }
+	.saklar-sidebar { min-width: 44px; }
 	.pilihan input, .fitur-grid input { width: 24px; height: 24px; }
 	.contoh-warna input[type='color'] { width: 56px; height: 48px; }
 	.pilihan label.kartu-pilih:hover, .contoh-warna:hover { background: none; }
 	.pilihan label.kartu-pilih:active, .fitur-grid label:active, .contoh-warna:active { background: var(--arsip); }
 }
 
-/* Landscape pendek: lepas sticky agar isi muat vertikal */
-@media (max-height: 520px) and (orientation: landscape) {
+/* Landscape pendek: lepas sticky agar isi muat vertikal.
+   min-width 560px memastikan ini hanya untuk HP yang benar-benar dimiringkan — bukan
+   untuk layar portrait yang menyusut karena keyboard (mis. 320x284 ikut jadi "landscape"). */
+@media (max-height: 520px) and (orientation: landscape) and (min-width: 560px) {
 	.navigator { position: static; }
-	.pembuka { padding: 24px 0; }
+	.pembuka { padding-block: 24px; }
 }
 
 /* Dokumen cetak dossier (Bab 01–08 linear, teks terseleksi agar terbaca AI) */
