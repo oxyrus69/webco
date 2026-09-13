@@ -32,11 +32,22 @@ async function simpanFile(file: File, folder: string, prefix: string): Promise<s
 	if (!file || file.size === 0) return null;
 	const aman = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-60);
 	const nama = `${prefix}-${Date.now()}-${aman}`;
-	const dir = join(process.cwd(), 'static', 'uploads', folder);
-	await mkdir(dir, { recursive: true });
-	const buf = Buffer.from(await file.arrayBuffer());
-	await writeFile(join(dir, nama), buf);
-	return `/uploads/${folder}/${nama}`;
+	// Vercel filesystem hanya /tmp yang writable; gunakan fallback agar tidak melempar EROFS
+	// dan dossier tetap tersimpan walaupun berkas ikut terhapus antar request.
+	const roots = [join(process.cwd(), 'static', 'uploads', folder), join('/tmp', 'uploads', folder)];
+	for (const dir of roots) {
+		try {
+			await mkdir(dir, { recursive: true });
+			const buf = Buffer.from(await file.arrayBuffer());
+			await writeFile(join(dir, nama), buf);
+			// URL relatif tetap /uploads/... agar konsisten; di Vercel file hanya hidup di /tmp
+			return dir.startsWith('/tmp') ? null : `/uploads/${folder}/${nama}`;
+		} catch {
+			continue;
+		}
+	}
+	console.warn('[webco] simpanFile gagal di semua lokasi, lanjut tanpa berkas:', aman);
+	return null;
 }
 
 export const actions: Actions = {
@@ -78,21 +89,32 @@ export const actions: Actions = {
 		if (Object.keys(galat).length) return fail(400, { galat, nilai: d });
 
 		const noTiket = ticket();
+		// Pisahkan tahap simpan berkas (best-effort) dari insert DB agar kegagalan FS
+		// tidak menyamar jadi "Database tidak dapat dihubungi".
+		let logoUrl: string | null = null;
+		let katalogUrl: string | null = null;
+		let portoUrl: string | null = null;
+		let legalUrl: string | null = null;
+		const logoKlienUrls: string[] = [];
+		const fotoTimUrls: string[] = [];
 		try {
-			const logoUrl = logo && logo.size ? await simpanFile(logo, noTiket, 'logo') : null;
-			const katalogUrl = katalog && katalog.size ? await simpanFile(katalog, noTiket, 'katalog') : null;
-			const portoUrl = porto && porto.size ? await simpanFile(porto, noTiket, 'portofolio') : null;
-			const legalUrl = legal && legal.size ? await simpanFile(legal, noTiket, 'legalitas') : null;
-			const logoKlienUrls: string[] = [];
+			logoUrl = logo && logo.size ? await simpanFile(logo, noTiket, 'logo') : null;
+			katalogUrl = katalog && katalog.size ? await simpanFile(katalog, noTiket, 'katalog') : null;
+			portoUrl = porto && porto.size ? await simpanFile(porto, noTiket, 'portofolio') : null;
+			legalUrl = legal && legal.size ? await simpanFile(legal, noTiket, 'legalitas') : null;
 			for (const f of fd.getAll('logoKlienFiles')) {
 				const ff = f as File;
 				if (ff.size) { const u = await simpanFile(ff, noTiket, 'klien'); if (u) logoKlienUrls.push(u); }
 			}
-			const fotoTimUrls: string[] = [];
 			for (const f of fd.getAll('fotoTimFiles')) {
 				const ff = f as File;
 				if (ff.size) { const u = await simpanFile(ff, noTiket, 'tim'); if (u) fotoTimUrls.push(u); }
 			}
+		} catch (e) {
+			console.warn('[webco] simpanFile gagal, lanjut tanpa berkas:', e);
+		}
+
+		try {
 
 			const tahun = d.tahunBerdiri?.trim() ? Number(d.tahunBerdiri) : null;
 			await db.insert(briefSubmissions).values({

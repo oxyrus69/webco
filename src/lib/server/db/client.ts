@@ -6,7 +6,8 @@ import * as schema from './schema';
 function buatDb() {
 	const url = env.DATABASE_URL;
 	if (!url) {
-		throw new Error('DATABASE_URL belum diisi di file .env');
+		console.error('[webco] DATABASE_URL kosong — set di Vercel: Settings → Environment Variables → DATABASE_URL, lalu Redeploy.');
+		throw new Error('DATABASE_URL belum diisi. Set Environment Variable DATABASE_URL di Vercel.');
 	}
 	return drizzle(neon(url), { schema });
 }
