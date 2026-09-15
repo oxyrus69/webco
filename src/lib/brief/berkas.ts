@@ -69,6 +69,29 @@ export function pesanTerlaluBesar(slot: SlotBerkas, byte: number, batasMB: numbe
 	return `${slot.label} berukuran ${mb(byte)}MB, sedangkan batas di sini ${batasMB}MB. Kecilkan berkasnya (kompres PDF atau perkecil gambarnya) lalu unggah ulang — atau tempel tautan berkas di kolom catatan Bab 08, tim kami mengambilnya dari sana.`;
 }
 
+/**
+ * Nama format Cloudinary per tipe MIME. Dipakai untuk menandatangani unggahan
+ * langsung, supaya Cloudinary sendiri yang menolak format di luar slot.
+ */
+const FORMAT_CLOUDINARY: Record<string, string> = {
+	'image/png': 'png',
+	'image/svg+xml': 'svg',
+	'image/webp': 'webp',
+	'image/jpeg': 'jpg',
+	'application/pdf': 'pdf'
+};
+
+export function formatSlotCloudinary(slot: SlotBerkas): string[] {
+	const set = new Set(slot.tipe.map((t) => FORMAT_CLOUDINARY[t]).filter(Boolean));
+	// Cloudinary menormalkan .jpeg menjadi jpg; keduanya diterima agar unggahan wajar tidak ditolak.
+	if (set.has('jpg')) set.add('jpeg');
+	// SVG tidak boleh ikut daftar ini: begitu `allowed_formats` memuat "svg", Cloudinary
+	// menolak unggahannya dengan "Raw file format svg not allowed". Berkas SVG karena itu
+	// dikirim lewat formulir dan disimpan di sisi server — hasilnya tetap Cloudinary.
+	set.delete('svg');
+	return [...set];
+}
+
 const LABEL_TIPE: Record<string, string> = {
 	'image/png': 'PNG',
 	'image/svg+xml': 'SVG',

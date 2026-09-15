@@ -7,13 +7,15 @@ import { eq } from 'drizzle-orm';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { namaAman } from '$lib/brief/berkas';
+import { cloudinarySiap, hapusCloudinary, keCloudinary, publicIdCloudinary } from '$lib/server/cloudinary';
 
 /**
- * Penyimpanan berkas dossier. Tiga lapis, dicoba berurutan:
- * 1. Vercel Blob — dipakai di produksi setelah Blob store dihubungkan (BLOB_READ_WRITE_TOKEN).
- * 2. Folder `static/uploads` — saat dijalankan lokal (`npm run dev`) tanpa token Blob.
- * 3. Neon (kolom `bytea` tabel `brief_files`) — jaring pengaman supaya berkas tidak
- *    pernah hilang diam-diam, walau Blob belum dikonfigurasi di lingkungan itu.
+ * Penyimpanan berkas dossier. Empat lapis, dicoba berurutan:
+ * 1. Cloudinary — wadah utama untuk gambar & PDF (CLOUDINARY_URL atau trio CLOUDINARY_*).
+ * 2. Vercel Blob — dipakai di produksi bila Blob store dihubungkan (BLOB_READ_WRITE_TOKEN).
+ * 3. Folder `static/uploads` — saat dijalankan lokal (`npm run dev`) tanpa Cloudinary/Blob.
+ * 4. Neon (kolom `bytea` tabel `brief_files`) — jaring pengaman supaya berkas tidak
+ *    pernah hilang diam-diam, walau wadah mana pun belum dikonfigurasi di lingkungan itu.
  */
 
 export function blobSiap(): boolean {
@@ -21,8 +23,19 @@ export function blobSiap(): boolean {
 }
 
 /**
+ * Wadah yang bisa dipakai untuk unggah langsung dari browser (berkas tidak lewat
+ * fungsi server, jadi tidak tersangkut batas body 4,5MB milik Vercel). Cloudinary
+ * didahulukan; Blob tetap jadi cadangan bila kredensial Cloudinary belum ada.
+ */
+export function penyimpananLangsung(): 'cloudinary' | 'blob' | null {
+	if (cloudinarySiap()) return 'cloudinary';
+	if (blobSiap()) return 'blob';
+	return null;
+}
+
+/**
  * Batas aman bila berkas harus ikut body request formulir (bukan unggah langsung
- * ke Blob): Vercel memutus body fungsi di 4,5MB, Apache/Vite lokal longgar.
+ * ke wadah): Vercel memutus body fungsi di 4,5MB, Apache/Vite lokal longgar.
  */
 export function batasFormMB(): number {
 	return env.VERCEL ? 4 : 10;
@@ -30,8 +43,8 @@ export function batasFormMB(): number {
 
 /** Batas per berkas yang benar-benar bisa lewat di lingkungan ini. */
 export function maksBerkasMB(): number {
-	// Unggahan langsung dari browser ke Blob tidak melewati fungsi server.
-	if (blobSiap()) return 10;
+	// Unggahan langsung dari browser tidak melewati fungsi server.
+	if (penyimpananLangsung()) return 10;
 	return batasFormMB();
 }
 
@@ -73,6 +86,13 @@ export async function simpanBerkas(file: File, ticket: string, slot: string): Pr
 	const tipe = file.type || null;
 	const dicoba: string[] = [];
 
+	if (cloudinarySiap()) {
+		try {
+			return await keCloudinary(isi, publicIdCloudinary(ticket, nama));
+		} catch (e) {
+			dicoba.push('cloudinary: ' + (e as Error).message);
+		}
+	}
 	if (blobSiap()) {
 		try {
 			return await keBlob(isi, `uploads/${ticket}/${nama}`, tipe);
@@ -99,9 +119,14 @@ export async function simpanBerkas(file: File, ticket: string, slot: string): Pr
 	);
 }
 
-/** Hapus semua berkas milik satu tiket: objek Blob, baris Neon, dan folder lokal. */
+/** Hapus semua berkas milik satu tiket: objek Cloudinary, objek Blob, baris Neon, dan folder lokal. */
 export async function hapusBerkas(ticket: string, urls: (string | null | undefined)[]) {
-	const blobUrls = urls.filter((u): u is string => !!u && /^https?:\/\//.test(u));
+	await hapusCloudinary(urls);
+
+	// Hanya tautan Blob yang dikirim ke API Blob; tautan Cloudinary ditangani lapis Cloudinary di atas.
+	const blobUrls = urls.filter(
+		(u): u is string => !!u && /\.public\.blob\.vercel-storage\.com\//i.test(u)
+	);
 	if (blobUrls.length && blobSiap()) {
 		try {
 			await del(blobUrls, { token: env.BLOB_READ_WRITE_TOKEN });

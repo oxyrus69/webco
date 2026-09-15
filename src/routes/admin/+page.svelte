@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import PratinjauBerkas from '$lib/components/PratinjauBerkas.svelte';
+	import { ringkasanBerkas } from '$lib/pratinjau';
 
 	let { data, form } = $props();
 	const rows = $derived(data.rows ?? []);
 	const counts = $derived(data.counts);
+	const berkas = (r: any) => ringkasanBerkas(r);
 
 	function tanggal(v: unknown) {
 		try { return new Date(v as string).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }); }
@@ -62,13 +65,24 @@
 				<p class="hasil-info" aria-live="polite">Menampilkan {rows.length} dossier.</p>
 				<div style="overflow-x:auto">
 					<table class="tabel">
-						<thead><tr><th>Tiket</th><th>Perusahaan</th><th>Kontak</th><th>Masuk</th><th>Status</th><th>Aksi</th></tr></thead>
+						<thead><tr><th>Tiket</th><th>Perusahaan</th><th>Kontak</th><th>Berkas</th><th>Masuk</th><th>Status</th><th>Aksi</th></tr></thead>
 						<tbody>
 							{#each rows as r}
+								{@const b = berkas(r)}
 								<tr>
 									<td><a class="tiket-link" href={`/admin/${r.id}`}>{r.ticket}</a></td>
 									<td><b>{r.namaResmi}</b><br /><span style="color:var(--tinta-redup)">{r.bidang}</span></td>
 									<td>{r.kontakNama}<br /><span style="color:var(--tinta-redup)">{r.kontakWa}</span></td>
+									<td>
+										{#if b.jumlah}
+											<div class="berkas-mini">
+												{#if r.logoUrl}<PratinjauBerkas url={r.logoUrl} lebar={96} tinggi={56} ringkas />{/if}
+												<span class="jumlah" title={`Terlampir: ${b.isi.join(', ')}`}>{b.jumlah} berkas</span>
+											</div>
+										{:else}
+											<span class="tanpa-berkas" title="Klien belum melampirkan berkas apa pun">belum ada</span>
+										{/if}
+									</td>
 									<td style="white-space:nowrap">{tanggal(r.createdAt)}</td>
 									<td><span class="lencana {r.status}">{r.status}</span></td>
 									<td style="white-space:nowrap">

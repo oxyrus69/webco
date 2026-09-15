@@ -12,6 +12,10 @@
 		pesanTipeSalah,
 		slotBerkas
 	} from '$lib/brief/berkas';
+	import { kirimKeCloudinary, mintaTandaUnggah } from '$lib/brief/unggah';
+	import PratinjauLampiran from '$lib/components/PratinjauLampiran.svelte';
+	import { jenisBerkas, type LampiranPilihan } from '$lib/pratinjau';
+	import { onDestroy } from 'svelte';
 
 	let { data, form } = $props();
 
@@ -39,13 +43,22 @@
 	let galatUmum = $state('');
 
 	/* ---------- Berkas unggahan ----------
-	   Bila Vercel Blob aktif, berkas dikirim langsung dari browser ke Blob sehingga
-	   ukurannya tidak dibatasi body request fungsi server (4,5MB di Vercel). Kalau
-	   Blob belum ada atau unggahan langsung gagal, berkas ikut dikirim bersama
-	   formulir dan disimpan di sisi server (folder lokal saat dev, Neon saat produksi). */
+	   Wadah utama adalah Cloudinary (gambar & PDF), dengan Vercel Blob sebagai cadangan.
+	   Berkas dikirim langsung dari browser ke wadah sehingga ukurannya tidak dibatasi body
+	   request fungsi server (4,5MB di Vercel). Kalau wadah belum dikonfigurasi atau
+	   unggahan langsung gagal, berkas ikut dikirim bersama formulir dan disimpan di sisi
+	   server (Cloudinary/Blob, folder lokal saat dev, Neon sebagai jaring pengaman). */
 	type StatusBerkas = 'kosong' | 'mengunggah' | 'siap' | 'lewat-form' | 'gagal';
-	type HasilBerkas = { status: StatusBerkas; urls: string[]; pesan: string; persen: number };
-	const KOSONG: HasilBerkas = { status: 'kosong', urls: [], pesan: '', persen: 0 };
+	type HasilBerkas = {
+		status: StatusBerkas;
+		/** Tautan yang sudah benar-benar ada di wadah — inilah yang ikut terkirim (hidden field). */
+		urls: string[];
+		/** Lampiran yang dipilih pengirim, untuk pratinjau sebelum dossier dikirim. */
+		lampiran: LampiranPilihan[];
+		pesan: string;
+		persen: number;
+	};
+	const KOSONG: HasilBerkas = { status: 'kosong', urls: [], lampiran: [], pesan: '', persen: 0 };
 
 	let berkas = $state<Record<string, HasilBerkas>>({});
 	// Versi naik setiap kali pengirim menekan "Ganti berkas" → input dibuat ulang kosong.
@@ -70,11 +83,61 @@
 			? crypto.randomUUID()
 			: Math.random().toString(36).slice(2, 12);
 
+	// Cloudinary menolak SVG di jalur unggah bertanda tangan (allowed_formats tidak boleh
+	// memuat svg), jadi berkas SVG selalu ikut formulir dan disimpan di sisi server.
+	const svgSaja = (f: File) => f.type === 'image/svg+xml' || /\.svg$/i.test(f.name);
+
+	/**
+	 * Kirim berkas langsung ke wadah aktif: tanda tangan dari server, berkasnya ke Cloudinary.
+	 * Hasilnya sejajar dengan urutan `daftar`; `null` berarti berkas itu ikut formulir
+	 * (SVG selalu begitu, begitu pula saat unggahan langsung tidak tersedia).
+	 */
+	async function keWadah(
+		daftar: File[],
+		slotNama: string,
+		maju: (persen: number) => void
+	): Promise<(string | null)[]> {
+		const hasil: (string | null)[] = [];
+		if (data?.penyimpananLangsung === 'cloudinary') {
+			for (const f of daftar) {
+				if (svgSaja(f)) {
+					hasil.push(null);
+					continue;
+				}
+				const tanda = await mintaTandaUnggah(slotNama, f.name);
+				hasil.push(await kirimKeCloudinary(f, tanda, maju));
+			}
+			return hasil;
+		}
+		const { upload } = await import('@vercel/blob/client');
+		for (const f of daftar) {
+			const r = await upload(`uploads/${acak()}/${namaAman(f.name)}`, f, {
+				access: 'public',
+				handleUploadUrl: '/api/berkas',
+				multipart: true,
+				onUploadProgress: ({ percentage }) => maju(Math.round(percentage))
+			});
+			hasil.push(r.url);
+		}
+		return hasil;
+	}
+
+	/** Lepaskan object URL berkas lokal supaya memori browser tidak menumpuk. */
+	function lepasLampiran(info: HasilBerkas) {
+		for (const l of info.lampiran) if (l.lokal) URL.revokeObjectURL(l.tautan);
+	}
+
+	onDestroy(() => {
+		for (const info of Object.values(berkas)) lepasLampiran(info);
+	});
+
 	async function pilihBerkas(e: Event, slotNama: string) {
 		const input = e.currentTarget as HTMLInputElement;
 		const slot = slotBerkas(slotNama);
 		if (!slot) return;
 		const daftar = [...(input.files ?? [])];
+		// Pilihan lama dilepas lebih dulu, baik diganti berkas baru maupun dikosongkan.
+		lepasLampiran(infoBerkas(slotNama));
 		if (!daftar.length) {
 			berkas[slotNama] = { ...KOSONG };
 			return;
@@ -84,21 +147,33 @@
 		const batas = Math.min(slot.maksMB, data?.maksBerkasMB ?? slot.maksMB);
 		for (const f of daftar) {
 			if (f.size > batas * MB) {
-				berkas[slotNama] = { status: 'gagal', urls: [], pesan: pesanTerlaluBesar(slot, f.size, batas), persen: 0 };
+				berkas[slotNama] = { status: 'gagal', urls: [], lampiran: [], pesan: pesanTerlaluBesar(slot, f.size, batas), persen: 0 };
 				input.value = '';
 				return;
 			}
 			if (f.type && !slot.tipe.includes(f.type)) {
-				berkas[slotNama] = { status: 'gagal', urls: [], pesan: pesanTipeSalah(slot), persen: 0 };
+				berkas[slotNama] = { status: 'gagal', urls: [], lampiran: [], pesan: pesanTipeSalah(slot), persen: 0 };
 				input.value = '';
 				return;
 			}
 		}
 
-		if (!data?.blobSiap) {
+		// Pratinjau muncul seketika dari berkas di perangkat pengirim; setelah naik ke
+		// wadah, tautannya diganti URL wadah supaya thumbnail ikut dikecilkan.
+		const lampiran: LampiranPilihan[] = daftar.map((f) => ({
+			nama: f.name,
+			ukuran: f.size,
+			jenis: jenisBerkas(f.name),
+			tautan: URL.createObjectURL(f),
+			diWadah: false,
+			lokal: true
+		}));
+
+		if (!data?.penyimpananLangsung) {
 			berkas[slotNama] = {
 				status: 'lewat-form',
 				urls: [],
+				lampiran,
 				pesan: 'Berkas ini ikut terkirim bersama formulir.',
 				persen: 100
 			};
@@ -108,27 +183,41 @@
 		berkas[slotNama] = {
 			status: 'mengunggah',
 			urls: [],
+			lampiran,
 			pesan: daftar.length > 1 ? `Mengunggah ${daftar.length} berkas…` : 'Mengunggah berkas…',
 			persen: 0
 		};
+		const maju = (persen: number) => {
+			berkas[slotNama] = { ...infoBerkas(slotNama), persen };
+		};
 		try {
-			const { upload } = await import('@vercel/blob/client');
+			const urlsPerBerkas = await keWadah(daftar, slotNama, maju);
 			const urls: string[] = [];
-			for (const f of daftar) {
-				const hasil = await upload(`uploads/${acak()}/${namaAman(f.name)}`, f, {
-					access: 'public',
-					handleUploadUrl: '/api/berkas',
-					multipart: true,
-					onUploadProgress: ({ percentage }) => {
-						berkas[slotNama] = { ...infoBerkas(slotNama), persen: Math.round(percentage) };
-					}
-				});
-				urls.push(hasil.url);
+			const tampil = lampiran.map((l, i) => {
+				const url = urlsPerBerkas[i];
+				if (!url) return l; // tetap dikirim bersama formulir → pratinjau lokal dibiarkan
+				urls.push(url);
+				if (l.lokal) URL.revokeObjectURL(l.tautan);
+				return { ...l, tautan: url, diWadah: true, lokal: false };
+			});
+			const lewatForm = daftar.length - urls.length;
+			if (!urls.length) {
+				// Seluruh berkas ikut formulir (mis. semua SVG): input tetap memegang berkasnya.
+				berkas[slotNama] = {
+					status: 'lewat-form',
+					urls: [],
+					lampiran: tampil,
+					pesan: 'Berkas SVG ikut terkirim bersama formulir.',
+					persen: 100
+				};
+				return;
 			}
+			const pesan = urls.length > 1 ? `${urls.length} berkas siap ikut terkirim.` : 'Berkas siap ikut terkirim.';
 			berkas[slotNama] = {
 				status: 'siap',
 				urls,
-				pesan: urls.length > 1 ? `${urls.length} berkas siap ikut terkirim.` : 'Berkas siap ikut terkirim.',
+				lampiran: tampil,
+				pesan: lewatForm ? `${pesan} ${lewatForm} berkas SVG ikut bersama formulir.` : pesan,
 				persen: 100
 			};
 		} catch (err) {
@@ -142,6 +231,8 @@
 				berkas[slotNama] = {
 					status: 'gagal',
 					urls: [],
+					// Tidak dipratinjau: berkas ini memang tidak akan dikirim sampai dikecilkan.
+					lampiran: [],
 					pesan: pesanTerlaluBesar(slot, kebesaran.size, batasForm),
 					persen: 0
 				};
@@ -150,6 +241,7 @@
 			berkas[slotNama] = {
 				status: 'lewat-form',
 				urls: [],
+				lampiran,
 				pesan:
 					'Unggahan langsung tidak tersedia — berkas akan dikirim bersama formulir. Bila pengiriman ditolak, kecilkan berkasnya lalu coba lagi.',
 				persen: 0
@@ -158,6 +250,7 @@
 	}
 
 	function gantiBerkas(slotNama: string) {
+		lepasLampiran(infoBerkas(slotNama));
 		berkas[slotNama] = { ...KOSONG };
 		versiBerkas[slotNama] = (versiBerkas[slotNama] ?? 0) + 1;
 	}
@@ -230,6 +323,7 @@
 	{#if infoBerkas(slot).status === 'mengunggah'}
 		<div class="berkas-maju" aria-hidden="true"><i style="width: {infoBerkas(slot).persen}%"></i></div>
 	{/if}
+	<PratinjauLampiran daftar={infoBerkas(slot).lampiran} />
 	{#if infoBerkas(slot).pesan}
 		<p
 			class="berkas-pesan"
@@ -658,15 +752,16 @@
 								<h3>Berkas yang ikut terkirim</h3>
 								<ul class="daftar-berkas">
 									{#each berkasTerlampir as b}
-										<li>
-											<b>{b.slot.label}</b> — {b.info.status === 'siap'
-												? 'sudah diunggah'
-												: b.info.status === 'mengunggah'
-													? 'sedang diunggah…'
-													: b.info.status === 'gagal'
-														? 'gagal — periksa pesan di bab terkait'
-														: 'dikirim bersama formulir'}
-										</li>
+									<li>
+										<b>{b.slot.label}</b> — {b.info.status === 'siap'
+											? 'sudah diunggah'
+											: b.info.status === 'mengunggah'
+												? 'sedang diunggah…'
+												: b.info.status === 'gagal'
+													? 'gagal — periksa pesan di bab terkait'
+													: 'dikirim bersama formulir'}
+										<PratinjauLampiran daftar={b.info.lampiran} lebar={150} tinggi={92} />
+									</li>
 									{/each}
 								</ul>
 							</div>

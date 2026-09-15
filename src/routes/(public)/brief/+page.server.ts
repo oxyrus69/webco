@@ -5,15 +5,18 @@ import {
 	MB,
 	SLOT_BERKAS,
 	pesanTerlaluBesar,
-	pesanTipeSalah
+	pesanTipeSalah,
+	slotBerkas,
+	type SlotBerkas
 } from '$lib/brief/berkas';
-import { GalatBerkas, batasFormMB, blobSiap, hapusBerkas, maksBerkasMB, simpanBerkas } from '$lib/server/storage';
+import { GalatBerkas, batasFormMB, hapusBerkas, maksBerkasMB, penyimpananLangsung, simpanBerkas } from '$lib/server/storage';
+import { namaCloud, ukuranTautan } from '$lib/server/cloudinary';
 import type { Actions, PageServerLoad } from './$types';
 
-// Klien perlu tahu apakah berkas diunggah langsung ke Blob dan seberapa besar
-// yang benar-benar bisa lewat di lingkungan ini (Vercel memutus body di 4,5MB).
+// Klien perlu tahu ke wadah mana berkas dikirim langsung (Cloudinary/Blob) dan seberapa
+// besar yang benar-benar bisa lewat di lingkungan ini (Vercel memutus body di 4,5MB).
 export const load: PageServerLoad = async () => ({
-	blobSiap: blobSiap(),
+	penyimpananLangsung: penyimpananLangsung(),
 	maksBerkasMB: maksBerkasMB(),
 	// Dipakai saat unggahan langsung gagal dan berkas terpaksa ikut formulir.
 	batasFormMB: batasFormMB()
@@ -43,24 +46,31 @@ function hex(fd: FormData, k: string): string | null {
 }
 
 /**
- * URL berkas yang sudah diunggah klien langsung ke Vercel Blob (hidden field `blob-<slot>`).
- * Hanya host penyimpanan Blob sendiri yang diterima: field ini datang dari klien,
- * jadi tanpa penjagaan ini siapa pun bisa menempelkan tautan luar lalu admin
- * mengira itu berkas unggahan klien.
+ * URL berkas yang sudah diunggah klien langsung ke wadah (hidden field `blob-<slot>`).
+ * Nama field dipertahankan agar draf lama dan pengirim tanpa JS tetap bekerja.
+ * Hanya host wadah milik kita yang diterima: field ini datang dari klien, jadi tanpa
+ * penjagaan ini siapa pun bisa menempelkan tautan luar lalu admin mengira itu berkas
+ * unggahan klien. Tautan Cloudinary juga harus berada di akun cloud kita sendiri.
  */
 const HOST_BLOB = /\.public\.blob\.vercel-storage\.com$/i;
-const urlBlob = (fd: FormData, slot: string) =>
+
+function tautanWadah(u: string): boolean {
+	try {
+		const x = new URL(u);
+		if (x.protocol !== 'https:') return false;
+		if (HOST_BLOB.test(x.hostname)) return true;
+		const cloud = namaCloud();
+		return x.hostname === 'res.cloudinary.com' && !!cloud && x.pathname.startsWith(`/${cloud}/`);
+	} catch {
+		return false;
+	}
+}
+
+const urlWadah = (fd: FormData, slot: string) =>
 	fd
 		.getAll(`blob-${slot}`)
 		.map(String)
-		.filter((u) => {
-			try {
-				const x = new URL(u);
-				return x.protocol === 'https:' && HOST_BLOB.test(x.hostname);
-			} catch {
-				return false;
-			}
-		});
+		.filter(tautanWadah);
 
 const berkasMasuk = (fd: FormData, slot: string, banyak: boolean): File[] => {
 	if (banyak) return fd.getAll(slot).filter((f): f is File => f instanceof File && f.size > 0);
@@ -102,14 +112,14 @@ export const actions: Actions = {
 		if (Object.keys(galat).length) return fail(400, { galat, nilai: d });
 
 		const noTiket = ticket();
-		// Berkas yang sudah diunggah langsung ke Blob dikirim sebagai URL; sisanya
-		// (pengirim tanpa JS, atau Blob belum dikonfigurasi) disimpan sekarang.
-		let logoUrl: string | null = urlBlob(fd, 'logoFile')[0] ?? null;
-		let katalogUrl: string | null = urlBlob(fd, 'katalogFile')[0] ?? null;
-		let portoUrl: string | null = urlBlob(fd, 'portofolioFile')[0] ?? null;
-		let legalUrl: string | null = urlBlob(fd, 'legalitasFile')[0] ?? null;
-		const logoKlienUrls: string[] = urlBlob(fd, 'logoKlienFiles');
-		const fotoTimUrls: string[] = urlBlob(fd, 'fotoTimFiles');
+		// Berkas yang sudah diunggah langsung ke wadah (Cloudinary/Blob) dikirim sebagai URL;
+		// sisanya (pengirim tanpa JS, atau wadah belum dikonfigurasi) disimpan sekarang.
+		let logoUrl: string | null = urlWadah(fd, 'logoFile')[0] ?? null;
+		let katalogUrl: string | null = urlWadah(fd, 'katalogFile')[0] ?? null;
+		let portoUrl: string | null = urlWadah(fd, 'portofolioFile')[0] ?? null;
+		let legalUrl: string | null = urlWadah(fd, 'legalitasFile')[0] ?? null;
+		const logoKlienUrls: string[] = urlWadah(fd, 'logoKlienFiles');
+		const fotoTimUrls: string[] = urlWadah(fd, 'fotoTimFiles');
 
 		const simpan = async (slot: string): Promise<string | null> => {
 			const [file] = berkasMasuk(fd, slot, false);
@@ -141,6 +151,30 @@ export const actions: Actions = {
 				fotoTimUrls.push(await simpanBerkas(f, noTiket, 'fotoTimFiles'));
 			} catch {
 				galat.fotoTimFiles = 'Sebagian foto tim gagal disimpan. Kirim ulang berkasnya.';
+			}
+		}
+
+		// Berkas yang diunggah langsung dari browser tidak melewati fungsi server, jadi
+		// ukurannya dibaca ulang dari Cloudinary: batas per slot tetap berlaku walau
+		// pengirim memaksa mengunggah berkas besar (tanda tangan unggah tidak bisa membawa
+		// batas ukuran — Cloudinary hanya menerima daftar format).
+		for (const [slot, daftar] of [
+			[slotBerkas('logoFile'), logoUrl ? [logoUrl] : []],
+			[slotBerkas('katalogFile'), katalogUrl ? [katalogUrl] : []],
+			[slotBerkas('portofolioFile'), portoUrl ? [portoUrl] : []],
+			[slotBerkas('legalitasFile'), legalUrl ? [legalUrl] : []],
+			[slotBerkas('logoKlienFiles'), logoKlienUrls],
+			[slotBerkas('fotoTimFiles'), fotoTimUrls]
+		] as [SlotBerkas | undefined, string[]][]) {
+			if (!slot || !daftar.length || galat[slot.nama]) continue;
+			const maks = Math.min(slot.maksMB, batasLingkungan);
+			for (const u of daftar) {
+				if (!/^https:\/\/res\.cloudinary\.com\//i.test(u)) continue;
+				const byte = await ukuranTautan(u);
+				if (byte && byte > maks * MB) {
+					galat[slot.nama] = pesanTerlaluBesar(slot, byte, maks);
+					break;
+				}
 			}
 		}
 

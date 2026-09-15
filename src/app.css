@@ -152,6 +152,16 @@ a { color: var(--tinta); text-underline-offset: 3px; }
 .berkas-pesan.siap { color: var(--lumut); }
 .berkas-pesan.galat { font-size: 14px; color: var(--bata); font-weight: 700; }
 .berkas-pesan.galat::before { content: '! '; font-weight: 800; }
+/* Pratinjau berkas yang dipilih pengirim, sebelum dossier dikirim */
+.lampiran { list-style: none; display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0 0; padding: 0; }
+.lampiran-item { display: flex; gap: 10px; align-items: center; max-width: 340px; border: 1px solid var(--garis); border-radius: var(--radius-kartu); background: var(--kertas); padding: 8px; }
+.bingkai-lampiran, .cap-lampiran { display: grid; place-items: center; flex: none; width: var(--lebar-lampiran, 128px); height: var(--tinggi-lampiran, 76px); border: 1px solid var(--garis); border-radius: var(--radius-input); background: var(--arsip); overflow: hidden; }
+.bingkai-lampiran img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; }
+.cap-lampiran { font-family: var(--mono); font-size: 12px; color: var(--kuningan); }
+.teks-lampiran { display: grid; gap: 2px; min-width: 0; }
+.nama-lampiran { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.meta-lampiran { font-size: 13px; color: var(--tinta-redup); }
+
 .berkas-maju { height: 6px; background: #e7e1d1; border-radius: 99px; overflow: hidden; margin: 8px 0 0; }
 .berkas-maju i { display: block; height: 100%; background: var(--kuningan); border-radius: 99px; }
 .daftar-berkas { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 2px; font-size: 14px; }
@@ -185,6 +195,34 @@ a { color: var(--tinta); text-underline-offset: 3px; }
 .detail-bab h3 { margin: 0 0 4px; font-size: 16px; }
 .detail-bab .no-bab { font-family: var(--mono); font-size: 12px; color: var(--kuningan); }
 .berkas { display: flex; gap: 10px; align-items: center; font-size: 14px; margin-top: 8px; }
+
+/* Pratinjau berkas klien di panel admin: bingkai kertas + nama berkas mono.
+   Edge ATAU shadow — di sini cukup hairline, tanpa shadow. */
+.berkas-baris { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+.berkas-baris > p.berkas { margin-top: 0; flex: 1 1 220px; }
+.pratinjau { margin: 0; max-width: 220px; display: grid; gap: 6px; }
+.pratinjau .bingkai {
+	position: relative; display: grid; place-items: center;
+	height: var(--tinggi-pratinjau, 150px);
+	border: 1px solid var(--garis); border-radius: var(--radius-kartu);
+	background: var(--arsip); overflow: hidden;
+}
+.pratinjau .bingkai:hover { border-color: var(--tinta); }
+.pratinjau img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; }
+.pratinjau .cap-jenis {
+	position: absolute; left: 8px; bottom: 8px;
+	background: var(--kertas); border: 1px solid var(--garis); border-radius: 99px;
+	padding: 2px 8px; font-family: var(--mono); font-size: 11px; color: var(--tinta);
+}
+.pratinjau figcaption { display: flex; gap: 8px; align-items: baseline; font-family: var(--mono); font-size: 12px; color: var(--tinta-redup); overflow-wrap: anywhere; }
+.pratinjau figcaption a { color: var(--tinta); }
+.pratinjau figcaption .jenis, .berkas .jenis { font-family: var(--mono); font-size: 12px; color: var(--kuningan); }
+
+/* Ringkasan berkas di daftar dossier: bingkai kecil + jumlah berkas */
+.bingkai-mini { display: grid; width: 96px; flex: none; }
+.berkas-mini { display: flex; align-items: center; gap: 10px; }
+.berkas-mini .jumlah { font-family: var(--mono); font-size: 12px; color: var(--tinta); white-space: nowrap; }
+.tanpa-berkas { font-size: 14px; color: var(--tinta-redup); }
 
 /* Halaman contoh dossier (Read mode: dokumen linear + daftar isi jangkar) */
 .contoh-daftar { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 18px 0 20px; padding: 0; }

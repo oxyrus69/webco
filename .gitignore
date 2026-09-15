@@ -24,5 +24,6 @@ vite.config.ts.timestamp-*
 
 static/uploads/*
 !static/uploads/.gitkeep
-.vercel
-.env*
+
+# Berkas kerja agen — bukan bagian dari produk
+.freebuff/

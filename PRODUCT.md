@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-SvelteKit + Vite + Neon Postgres (postgresql://neondb_owner:...@ep-holy-leaf-b395lcau-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb). ORM: Drizzle + @neondatabase/serverless. Upload file (logo PNG/vector, katalog PDF, logo klien, foto tim, legalitas): Vercel Blob bila BLOB_READ_WRITE_TOKEN diisi (unggah langsung dari browser, lolos batas body 4,5MB Vercel Functions), cadangan folder `static/uploads` saat dev, dan cadangan terakhir kolom `bytea` di tabel `brief_files` Neon agar berkas selalu sampai ke admin. Bahasa UI: Bahasa Indonesia.
+SvelteKit + Vite + Neon Postgres (postgresql://neondb_owner:...@ep-holy-leaf-b395lcau-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb). ORM: Drizzle + @neondatabase/serverless. Upload file (logo PNG/vector, katalog PDF, logo klien, foto tim, legalitas): Cloudinary bila CLOUDINARY_URL diisi (unggah langsung dari browser memakai tanda tangan server, lolos batas body 4,5MB Vercel Functions; folder dan format ditentukan server), cadangan Vercel Blob bila BLOB_READ_WRITE_TOKEN diisi, cadangan folder `static/uploads` saat dev, dan cadangan terakhir kolom `bytea` di tabel `brief_files` Neon agar berkas selalu sampai ke admin. Bahasa UI: Bahasa Indonesia.
 
 ## Users
 
@@ -30,7 +30,7 @@ Alur: landing singkat → /brief (wizard 8 langkah, simpan draf di localStorage,
 
 ## Capabilities and Constraints
 
-Wajib: 8 bagian sesuai brief (kontak, identitas, profil, produk, portofolio, tim/legalitas opsional, sosmed, desain/fitur); pilihan gaya desain (Minimalis & Modern / Elegan & Mewah / Ceria & Penuh Warna / Korporat & Profesional / Lainnya); checkbox 6 fitur tambahan; upload 5 slot (batas & tipe per slot di `src/lib/brief/berkas.ts`, dijaga di klien dan server); tersimpan ke Neon tabel `brief_submissions`; halaman admin baca + ubah status + unduh berkas; responsif HP/desktop; nol JS error; konten visible tanpa JS (progressive enhancement via form actions, berkas tetap tersimpan lewat jalur multipart).
+Wajib: 8 bagian sesuai brief (kontak, identitas, profil, produk, portofolio, tim/legalitas opsional, sosmed, desain/fitur); pilihan gaya desain (Minimalis & Modern / Elegan & Mewah / Ceria & Penuh Warna / Korporat & Profesional / Lainnya); checkbox 6 fitur tambahan; upload 5 slot (batas & tipe per slot di `src/lib/brief/berkas.ts`, dijaga di klien dan server) dengan pratinjau berkas terpilih sebelum dikirim (thumbnail gambar, cuplikan halaman pertama PDF, nama + ukuran, tautan buka di tab baru); tersimpan ke Neon tabel `brief_submissions`; halaman admin baca + ubah status + unduh berkas; responsif HP/desktop; nol JS error; konten visible tanpa JS (progressive enhancement via form actions, berkas tetap tersimpan lewat jalur multipart).
 
 Belum diputuskan: auth admin (v1 tanpa login, via path /admin), notifikasi email/WA otomatis, multi-bahasa UI.
 
