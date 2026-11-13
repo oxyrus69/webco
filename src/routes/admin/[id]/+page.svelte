@@ -39,27 +39,33 @@
 
 <div class="workspace">
 	<div class="wrap">
-		<p class="crumb"><a href="/admin">Dashboard</a> / {r.ticket}</p>
-		<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-			<h1 class="judul-detail">{r.namaResmi}</h1>
-			<span class="lencana {r.status}">{r.status}</span>
+		<div class="subheader">
+			<div>
+				<div class="sh-kiri"><span class="sh-judul">{r.ticket} · {r.namaResmi}</span><span class="status-pill {r.status}">{r.status}</span></div>
+				<p class="sh-desc">{r.bidang} · {r.kontakNama} · masuk {r.createdAt ? new Date(r.createdAt).toLocaleDateString('id-ID', { dateStyle: 'medium' }) : '—'}</p>
+			</div>
+			<div class="sh-kanan">
+				<a class="btn btn-kedua btn-sm" href="/admin">← Dashboard</a>
+				<a class="btn btn-primer btn-sm" href={`/admin/${r.id}/cetak`} target="_blank" rel="noreferrer">Unduh PDF</a>
+			</div>
 		</div>
 
-		<form method="POST" action="?/status" use:enhance style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
-			<label for="status" class="label-status">Ubah status:</label>
-			<select id="status" name="status" style="font:inherit;padding:9px 12px;border:1px solid #b9b09a;border-radius:6px">
-				<option value="baru" selected={r.status === 'baru'}>baru</option>
-				<option value="diproses" selected={r.status === 'diproses'}>diproses</option>
-				<option value="selesai" selected={r.status === 'selesai'}>selesai</option>
-			</select>
-			<button class="btn btn-kedua btn-kecil" type="submit">Simpan status</button>
-			<a class="btn btn-kedua btn-kecil" href={`mailto:${r.kontakEmail}?subject=Menindaklanjuti briefing ${r.ticket}`}>Balas via email</a>
-			<a class="btn btn-kedua btn-kecil" href={`https://wa.me/${String(r.kontakWa).replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">Buka WhatsApp</a>
-			<a class="btn btn-primer btn-kecil" href={`/admin/${r.id}/cetak`} target="_blank" rel="noreferrer">Unduh PDF</a>
-		</form>
-		<form method="POST" action="?/hapus" use:enhance={({ cancel }) => { if (!confirm(`Hapus dossier ${r.ticket} beserta berkasnya? Tindakan ini tidak bisa dibatalkan.`)) cancel(); }} style="margin-bottom:20px">
-			<button class="btn btn-bahaya btn-kecil" type="submit">Hapus dossier ini</button>
-		</form>
+		<div class="detail-aksi">
+			<form class="form-status" method="POST" action="?/status" use:enhance>
+				<label for="status" class="label-status">Ubah status:</label>
+				<select id="status" name="status" style="font:inherit;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#0f172a;font-size:12px">
+					<option value="baru" selected={r.status === 'baru'}>baru</option>
+					<option value="diproses" selected={r.status === 'diproses'}>diproses</option>
+					<option value="selesai" selected={r.status === 'selesai'}>selesai</option>
+				</select>
+				<button class="btn btn-kedua btn-sm" type="submit">Simpan</button>
+				<a class="btn btn-kedua btn-sm" href={`mailto:${r.kontakEmail}?subject=Menindaklanjuti briefing ${r.ticket}`}>Balas email</a>
+				<a class="btn btn-kedua btn-sm" href={`https://wa.me/${String(r.kontakWa).replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer">WhatsApp</a>
+			</form>
+			<form method="POST" action="?/hapus" use:enhance={({ cancel }) => { if (!confirm(`Hapus dossier ${r.ticket} beserta berkasnya? Tindakan ini tidak bisa dibatalkan.`)) cancel(); }}>
+				<button class="btn btn-bahaya btn-kecil" type="submit">Hapus dossier</button>
+			</form>
+		</div>
 
 		<div class="tabs" role="tablist" aria-label="Bab dossier">
 			{#each daftar as d, i}

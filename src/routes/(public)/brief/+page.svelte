@@ -317,7 +317,7 @@
 	const pesanUmum = $derived(galatUmum || semuaGalat.umum || '');
 </script>
 
-<svelte:head><title>Isi Briefing — WebCo.</title></svelte:head>
+<svelte:head><title>Isi Formulir — WebCo.</title></svelte:head>
 
 {#snippet catatanBerkas(slot: string)}
 	{#if infoBerkas(slot).status === 'mengunggah'}
@@ -341,13 +341,13 @@
 
 <div class="workspace">
 	<div class="wrap">
-		<h1 class="sr-only">Isi dossier briefing WebCo.</h1>
+		<h1 class="sr-only">Isi formulir kebutuhan WebCo.</h1>
 		<p class="crumb">
-			<a href="/">Beranda</a> / Dossier briefing
+			<a href="/">Beranda</a> / Formulir kebutuhan
 		</p>
 		<div class="dossier-grid">
-			<aside class="navigator" aria-label="Daftar 8 bab">
-				<h2>DOSSIER · 8 BAB</h2>
+			<aside class="navigator" aria-label="Daftar 8 langkah">
+				<h2>FORMULIR · 8 LANGKAH</h2>
 				<ol class="nav-bab">
 					{#each STEPS as s, i}
 						<li>
@@ -367,7 +367,7 @@
 					</li>
 				</ol>
 				<div class="kemajuan" aria-hidden="true"><i style="width: {persen}%"></i></div>
-				<p class="kemajuan-teks" aria-live="polite">{persen}% bab wajib tuntas</p>
+				<p class="kemajuan-teks" aria-live="polite">{persen}% langkah wajib selesai</p>
 			</aside>
 
 			<div class="lembar" id="lembar-atas">
@@ -401,14 +401,14 @@
 						{@const s = STEPS[langkah]}
 						{#key langkah}
 						<div class="lembar-kepala masuk-bab">
-							<span class="no">BAB {s.no} / 08</span>
+							<span class="no">LANGKAH {s.no} / 08</span>
 							<div><h2>{s.judul}</h2><p>{s.sub} · {s.wajib ? 'Wajib diisi' : 'Boleh dikosongkan'}</p></div>
 						</div>
 						{/key}
 					{:else}
 						<div class="lembar-kepala">
 							<span class="no">SELESAI / KIRIM</span>
-							<div><h2>Periksa ringkasan dossier</h2><p>Betulkan per bab bila ada yang keliru, lalu kirim sekali.</p></div>
+							<div><h2>Periksa ringkasan formulir</h2><p>Betulkan per langkah bila ada yang keliru, lalu kirim sekali.</p></div>
 						</div>
 					{/if}
 
@@ -741,10 +741,10 @@
 										<dt>Desain</dt><dd>{d.warnaIdentitas || '—'} · {d.gayaDesain || '—'} · Fitur: {fitur.join(', ') || '—'}</dd>
 										<dt>Kode hex</dt><dd><span class="baris-hex"><input class="swatch" type="color" value={d.warnaHex1} disabled aria-hidden="true" /><span class="hex">{d.warnaHex1.toUpperCase()}</span><input class="swatch" type="color" value={d.warnaHex2} disabled aria-hidden="true" /><span class="hex">{d.warnaHex2.toUpperCase()}</span></span></dd>
 									{:else}
-										<dt>Ringkasan</dt><dd>{s.wajib ? 'Terisi (periksa kembali di bab terkait).' : 'Opsional — kosong tidak apa-apa.'}</dd>
+										<dt>Ringkasan</dt><dd>{s.wajib ? 'Sudah diisi (periksa lagi di langkah terkait).' : 'Boleh dilewati — kosong tidak apa-apa.'}</dd>
 									{/if}
 								</dl>
-								<button type="button" class="btn btn-kedua btn-kecil" style="margin-top:10px" onclick={() => ke(i)}>Betulkan bab {s.no}</button>
+								<button type="button" class="btn btn-kedua btn-kecil" style="margin-top:10px" onclick={() => ke(i)}>Betulkan langkah {s.no}</button>
 							</div>
 						{/each}
 						{#if berkasTerlampir.length}
@@ -758,7 +758,7 @@
 											: b.info.status === 'mengunggah'
 												? 'sedang diunggah…'
 												: b.info.status === 'gagal'
-													? 'gagal — periksa pesan di bab terkait'
+													? 'gagal — periksa pesan di langkah terkait'
 													: 'dikirim bersama formulir'}
 										<PratinjauLampiran daftar={b.info.lampiran} lebar={150} tinggi={92} />
 									</li>
@@ -766,7 +766,7 @@
 								</ul>
 							</div>
 						{/if}
-						<p class="persetujuan">Dengan menekan Kirim dossier, Anda setuju dihubungi WebCo. melalui kontak di Bab 01.</p>
+						<p class="persetujuan">Dengan menekan Kirim formulir, Anda setuju dihubungi WebCo. lewat kontak di langkah 01.</p>
 					</div>
 
 					<div class="navigasi-bab">
@@ -776,7 +776,7 @@
 						</div>
 						<div>
 							{#if langkah < 8}<button type="button" class="btn btn-primer" onclick={lanjut}>{langkah === 7 ? 'Periksa ringkasan' : 'Lanjut'}</button>{/if}
-							{#if langkah === 8}<button type="submit" class="btn btn-primer" disabled={mengunggah || berkasGagal}>Kirim dossier</button>{/if}
+							{#if langkah === 8}<button type="submit" class="btn btn-primer" disabled={mengunggah || berkasGagal}>Kirim formulir</button>{/if}
 						</div>
 					</div>
 					{#if mengunggah}
@@ -784,8 +784,8 @@
 					{/if}
 					{#if berkasGagal}
 						<p class="draf-info galat" aria-live="polite">
-							Ada berkas yang ditolak. Perbaiki atau kosongkan berkas itu di bab terkait sebelum
-							mengirim dossier.
+							Ada berkas yang ditolak. Perbaiki atau kosongkan berkas itu di langkah terkait sebelum
+							mengirim formulir.
 						</p>
 					{/if}
 					<p class="draf-info">Draf tersimpan otomatis di perangkat ini · <b>{persen}% tuntas</b></p>

@@ -2,16 +2,16 @@
 	import { STEPS } from '$lib/brief/steps';
 </script>
 
-<svelte:head><title>Contoh dossier terisi — WebCo.</title></svelte:head>
+<svelte:head><title>Contoh formulir terisi — WebCo.</title></svelte:head>
 
 <div class="workspace">
 	<div class="wrap">
-		<p class="crumb"><a href="/">Beranda</a> / Contoh dossier</p>
-		<h1 class="judul-halaman" style="max-width: 24ch; text-wrap: balance">Contoh dossier yang terisi lengkap</h1>
+		<p class="crumb"><a href="/">Beranda</a> / Contoh isian</p>
+		<h1 class="judul-halaman" style="max-width: 24ch; text-wrap: balance">Contoh formulir yang terisi lengkap</h1>
 		<p class="persetujuan" style="max-width: 68ch">
-			Di bawah ini dossier fiktif milik <b>PT Maju Baja Abadi</b> — perusahaan bahan bangunan
-			rekaan — yang diisi dari Bab 01 sampai 08 dengan lengkap. Seluruh nama, angka, dan tautan
-			adalah contoh. Pakai sebagai contekan saat mengisi dossier Anda sendiri.
+			Di bawah ini contoh formulir milik <b>PT Maju Baja Abadi</b> — perusahaan bahan bangunan
+			rekaan — yang diisi lengkap dari langkah 01 sampai 08. Seluruh nama, angka, dan tautan
+			hanya contoh. Pakai sebagai gambaran saat mengisi formulir Anda sendiri.
 		</p>
 
 		<ol class="nav-bab contoh-daftar" aria-label="Daftar isi contoh">
@@ -22,7 +22,7 @@
 
 		<div class="lembar">
 			<section id="contoh-kontak" class="contoh-bab">
-				<p class="no-bab">BAB 01 · INFORMASI KONTAK KLIEN</p>
+				<p class="no-bab">LANGKAH 01 · INFORMASI KONTAK KLIEN</p>
 				<h2>Informasi Kontak Klien</h2>
 				<dl class="contoh-isi">
 					<div><dt>Nama lengkap</dt><dd>Ratna Prameswari</dd></div>
@@ -33,7 +33,7 @@
 			</section>
 
 			<section id="contoh-identitas" class="contoh-bab">
-				<p class="no-bab">BAB 02 · IDENTITAS DASAR PERUSAHAAN</p>
+				<p class="no-bab">LANGKAH 02 · IDENTITAS DASAR PERUSAHAAN</p>
 				<h2>Identitas Dasar Perusahaan</h2>
 				<dl class="contoh-isi">
 					<div><dt>Nama perusahaan</dt><dd>PT Maju Baja Abadi (MBA)</dd></div>
@@ -49,7 +49,7 @@
 			</section>
 
 			<section id="contoh-profil" class="contoh-bab">
-				<p class="no-bab">BAB 03 · PROFIL &amp; LATAR BELAKANG</p>
+				<p class="no-bab">LANGKAH 03 · PROFIL &amp; LATAR BELAKANG</p>
 				<h2>Profil &amp; Latar Belakang</h2>
 				<dl class="contoh-isi">
 					<div><dt>Sejarah</dt><dd>Berdiri 2014 di Bandung oleh dua insinyur sipil. Berawal dari toko bahan bangunan, kini melayani 300 kontraktor di Jawa Barat.</dd></div>
@@ -61,7 +61,7 @@
 			</section>
 
 			<section id="contoh-produk" class="contoh-bab">
-				<p class="no-bab">BAB 04 · PRODUK &amp; LAYANAN</p>
+				<p class="no-bab">LANGKAH 04 · PRODUK &amp; LAYANAN</p>
 				<h2>Produk &amp; Layanan</h2>
 				<dl class="contoh-isi">
 					<div><dt>Produk utama</dt><dd>1) Atap baja ringan — garansi 10 tahun. 2) Jasa pasang — survei gratis Jabodetabek. 3) Kanopi aluminium custom.</dd></div>
@@ -71,7 +71,7 @@
 			</section>
 
 			<section id="contoh-portofolio" class="contoh-bab">
-				<p class="no-bab">BAB 05 · PORTOFOLIO, KLIEN &amp; TESTIMONI</p>
+				<p class="no-bab">LANGKAH 05 · PORTOFOLIO, KLIEN &amp; TESTIMONI</p>
 				<h2>Portofolio, Klien &amp; Testimoni</h2>
 				<dl class="contoh-isi">
 					<div><dt>Klien utama</dt><dd>PT Waskita Beton, Dinas PU Kota Bandung, Hotel Amaris.</dd></div>
@@ -81,7 +81,7 @@
 			</section>
 
 			<section id="contoh-tim" class="contoh-bab">
-				<p class="no-bab">BAB 06 · TIM &amp; LEGALITAS</p>
+				<p class="no-bab">LANGKAH 06 · TIM &amp; LEGALITAS</p>
 				<h2>Tim &amp; Legalitas</h2>
 				<dl class="contoh-isi">
 					<div><dt>Tim utama</dt><dd>Ir. Dedi Kurnia — Direktur Utama. Sari Lestari — Kepala Operasional.</dd></div>
@@ -90,7 +90,7 @@
 			</section>
 
 			<section id="contoh-sosial" class="contoh-bab">
-				<p class="no-bab">BAB 07 · TAUTAN &amp; SOSIAL MEDIA</p>
+				<p class="no-bab">LANGKAH 07 · TAUTAN &amp; SOSIAL MEDIA</p>
 				<h2>Tautan &amp; Sosial Media</h2>
 				<dl class="contoh-isi">
 					<div><dt>Instagram</dt><dd>@majubaja (contoh)</dd></div>
@@ -101,7 +101,7 @@
 			</section>
 
 			<section id="contoh-desain" class="contoh-bab">
-				<p class="no-bab">BAB 08 · DESAIN &amp; FITUR WEB</p>
+				<p class="no-bab">LANGKAH 08 · DESAIN &amp; FITUR WEB</p>
 				<h2>Desain &amp; Fitur Web</h2>
 				<dl class="contoh-isi">
 					<div><dt>Warna identitas</dt><dd>Biru dongker dan emas <span class="hex">#1C2A3A · #C49A3C</span></dd></div>
@@ -114,7 +114,7 @@
 		</div>
 
 		<div class="aksi" style="margin-top: 24px">
-			<a class="btn btn-primer" href="/brief">Isi dossier saya sekarang</a>
+			<a class="btn btn-primer" href="/brief">Isi formulir saya</a>
 			<a class="btn btn-kedua" href="/">Kembali ke beranda</a>
 		</div>
 	</div>

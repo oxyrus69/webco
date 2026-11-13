@@ -1,10 +1,10 @@
-# Design — WebCo. Ruang Briefing
+# Design — WebCo. Formulir Kebutuhan
 
-Mode: Operate (tugas: menyelesaikan dossier 8 bab). Persuade hanya di landing ringkas sebagai pintu masuk.
+Mode: Operate (tugas: menyelesaikan formulir 8 langkah). Persuade hanya di landing ringkas sebagai pintu masuk. Istilah publik: **formulir** dan **langkah**; panel admin tetap memakai **dossier** dan **bab**.
 
 ## Thesis
 
-Ruang briefing dossier bengkel: dokumen bernomor bab dengan navigator ordner di kiri, bukan landing SaaS generik. Menolak hero+metrics+grid fitur; pembuka adalah meja kerja yang menunjukkan dokumen, posisi, dan aksi kirim.
+Ruang briefing dossier bengkel: dokumen bernomor bab dengan navigator ordner di kiri, bukan landing SaaS generik. Dibalut estetika editorial modern — display serif yang hangat, kertas arsip, aturan hairline, aksen kuningan tunggal. Menolak hero+metrics+grid fitur; pembuka adalah meja kerja yang menunjukkan dokumen, posisi, dan aksi kirim. /* intentional: shift ke editorial modern per permintaan redesign */
 
 ## Palette (solid, tanpa gradient/glass/halo)
 
@@ -24,7 +24,8 @@ Larangan: tanpa purple-to-blue gradient, tanpa gradient text, tanpa glow/neon, t
 
 Alasan di luar daftar default: memakai satu keluarga variabel berporos lebar agar header dossier bisa padat-tegas dan body tetap netral dalam satu sistem — menghindari campur serif editorial generik.
 
-- Display + Body + Label: `Plus Jakarta Sans` 400–800 (keputusan 2026-09-12 dari critique `src-app-css`; menggantikan Archivo sebagai font standar perusahaan). Tanpa width axis: display memakai bobot 800 + tracking −0.02em. Google Fonts `display=swap`. Fallback: system-ui.
+- Display: `Fraunces` 400–800 dengan optical sizing (opsz 9–144) — dipakai untuk H1/H2 halaman dan judul lembar, roman (bukan italic) agar tidak jadi shortcut editorial generik. /* intentional: serif display untuk arah editorial modern */
+- Body + UI + Label: `Plus Jakarta Sans` 400–800 (tetap, konsisten dengan identitas perusahaan). Mono data: `JetBrains Mono` 400/500 — HANYA untuk nomor bab, nomor tiket, nama/ukuran berkas, kode. Prosa (sub-navigator, progres, draf, th tabel, lencana, meta unggah) memakai sans.
 - Mono data: `JetBrains Mono` 400/500 — HANYA untuk nomor bab, nomor tiket, nama/ukuran berkas, kode. Prosa (sub-navigator, progres, draf, th tabel, lencana, meta unggah) memakai sans.
 - Skala: H1 30–42px/1.12 weight 800 tracking −0.02em maks 22ch; H2 bab 22px/1.25 weight 700; H3 grup 16px/1.4 weight 700; Body 16px/1.5; UI kecil min 13px (meta berkas/kode boleh 12px mono); tracking floor −0.04em.
 - Error 14px/700 bata + penanda `!` + kotak ringkasan ber-link ke kolom; help 13–14px regular — tidak boleh identik.
@@ -39,8 +40,8 @@ Alasan di luar daftar default: memakai satu keluarga variabel berporos lebar aga
 
 ## Layout
 
-- Landing: dua kolom tak seimbang yang disengaja lalu direbalance — kiri: H1 pendek + 3 langkah bernomor berurutan (isi → kirim → dihubungi) + CTA primer "Mulai isi briefing" + sekunder "Lihat contoh dossier"; kanan: miniatur lembar dossier 8 bab (daftar bernomor dengan status contoh, bukan mockup palsu). Tanpa metrics raksasa, tanpa grid 6 kartu.
-- /brief: workspace dua kolom — kiri sticky navigator 8 bab (nomor mono + nama + status centang, vertikal di desktop, progress bar horizontal di HP); kanan lembar formulir satu bab per layar dengan tombol Kembali/Lanjut, validasi per bab, simpan draf otomatis. Heading space-atas > space-bawah. Grup berelasi didekatkan, antar-grup direnggangkan.
+- Landing: dua kolom tak seimbang yang disengaja lalu direbalance — kiri: H1 pendek + 3 langkah bernomor berurutan (isi → kirim → dihubungi) + CTA primer "Mulai isi formulir" + sekunder "Lihat contoh isian"; kanan: miniatur lembar formulir 8 langkah (daftar bernomor dengan status contoh, bukan mockup palsu). Copy memakai bahasa sehari-hari untuk calon pembeli website/aplikasi, tanpa istilah teknis. Tanpa metrics raksasa, tanpa grid 6 kartu.
+- /brief: workspace dua kolom — kiri sticky navigator 8 langkah (nomor mono + nama + status centang, vertikal di desktop, progress bar horizontal di HP); kanan lembar formulir satu langkah per layar dengan tombol Kembali/Lanjut, validasi per langkah, simpan draf otomatis. Heading space-atas > space-bawah. Grup berelasi didekatkan, antar-grup direnggangkan.
 - /admin: tabel ringkas (tiket, perusahaan, kontak, status, tanggal) + halaman detail per bab dengan blok file unduhan.
 - Padding viewport horizontal wajib; tanpa scroll horizontal; kartu tidak flush ke tepi scroller.
 

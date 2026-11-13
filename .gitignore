@@ -27,3 +27,8 @@ static/uploads/*
 
 # Berkas kerja agen — bukan bagian dari produk
 .freebuff/
+
+# Artefak agent tambahan
+.impeccable/
+screenshots/
+.openchamber/
